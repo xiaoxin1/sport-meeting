@@ -1,0 +1,59 @@
+/* ============================================================
+   SFLS 设计系统 — 克制、正式、线上产品风格
+   主色采用沉稳的深靛蓝，避免高饱和"毕设感"配色。
+   ============================================================ */
+:root {
+  --sfls-primary: #1f3a5f;
+  --sfls-primary-light: #2f5686;
+  --sfls-accent: #c8a45c;
+  --sfls-bg: #f5f6f8;
+  --sfls-surface: #ffffff;
+  --sfls-border: #e6e8eb;
+  --sfls-text: #1c2430;
+  --sfls-text-secondary: #6b7684;
+  --sfls-radius: 8px;
+  --sfls-shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+
+  /* 覆盖 Element Plus 主色 */
+  --el-color-primary: var(--sfls-primary);
+  --el-color-primary-light-3: var(--sfls-primary-light);
+  --el-border-radius-base: var(--sfls-radius);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+  background: var(--sfls-bg);
+  color: var(--sfls-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sfls-card {
+  background: var(--sfls-surface);
+  border: 1px solid var(--sfls-border);
+  border-radius: var(--sfls-radius);
+  box-shadow: var(--sfls-shadow);
+}
+
+.sfls-page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--sfls-text);
+  margin: 0;
+}
+
+.sfls-page-subtitle {
+  font-size: 13px;
+  color: var(--sfls-text-secondary);
+  margin: 4px 0 0;
+}
