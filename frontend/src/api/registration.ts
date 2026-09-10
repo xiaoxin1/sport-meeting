@@ -95,3 +95,27 @@ export async function updateTeamEvents(
   );
   return data;
 }
+
+export interface EventRegistrationEntry {
+  class_id: number;
+  grade: string;
+  class_name: string;
+  athlete_name: string | null;
+  number: number | null;
+}
+
+export interface EventRegistrationList {
+  event_id: number;
+  event_name: string;
+  is_team: boolean;
+  entries: EventRegistrationEntry[];
+}
+
+export async function getEventRegistrations(
+  eventId: number,
+): Promise<EventRegistrationList> {
+  const { data } = await client.get<EventRegistrationList>(
+    `/registration/events/${eventId}/registrations`,
+  );
+  return data;
+}

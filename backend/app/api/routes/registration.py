@@ -20,6 +20,8 @@ from app.schemas.registration import (
     ClassTeamDetail,
     ClassTeamOut,
     ClassTeamUpdate,
+    EventRegistrationEntry,
+    EventRegistrationList,
     TeamEventUpdate,
 )
 from app.services.numbering import generate_numbers
@@ -211,6 +213,62 @@ def update_team_events(
     db.commit()
     db.refresh(cls)
     return _serialize_detail(cls, db)
+
+
+# ---------- 项目报名名单 ----------
+@router.get("/events/{event_id}/registrations", response_model=EventRegistrationList)
+def event_registrations(
+    event_id: int,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    event = db.get(Event, event_id)
+    if event is None or event.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    entries: list[EventRegistrationEntry] = []
+    if event.is_team:
+        # 团队项目：报名该项目的班级
+        rows = (
+            db.query(ClassTeam)
+            .join(ClassTeamEvent, ClassTeamEvent.class_team_id == ClassTeam.id)
+            .filter(ClassTeamEvent.event_id == event_id)
+            .order_by(ClassTeam.grade, ClassTeam.class_name)
+            .all()
+        )
+        entries = [
+            EventRegistrationEntry(
+                class_id=c.id, grade=c.grade, class_name=c.class_name
+            )
+            for c in rows
+        ]
+    else:
+        # 个人项目：报名该项目的学生（含班级、姓名、号码）
+        rows = (
+            db.query(Athlete, ClassTeam)
+            .join(AthleteEvent, AthleteEvent.athlete_id == Athlete.id)
+            .join(ClassTeam, ClassTeam.id == Athlete.class_team_id)
+            .filter(AthleteEvent.event_id == event_id)
+            .order_by(ClassTeam.grade, ClassTeam.class_name, Athlete.number, Athlete.id)
+            .all()
+        )
+        entries = [
+            EventRegistrationEntry(
+                class_id=c.id,
+                grade=c.grade,
+                class_name=c.class_name,
+                athlete_name=a.name,
+                number=a.number,
+            )
+            for a, c in rows
+        ]
+
+    return EventRegistrationList(
+        event_id=event.id,
+        event_name=event.name,
+        is_team=event.is_team,
+        entries=entries,
+    )
 
 
 # ---------- 辅助 ----------

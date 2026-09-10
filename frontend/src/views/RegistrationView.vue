@@ -216,7 +216,13 @@ async function handleGenerate() {
         </el-form-item>
         <div class="form-row">
           <el-form-item label="男生人数" class="flex1">
-            <el-input-number v-model="form.male_count" :min="0" :max="10" controls-position="right" />
+            <el-input-number
+              v-model="form.male_count"
+              :min="0"
+              :max="10"
+              controls-position="right"
+              style="width: 100%"
+            />
           </el-form-item>
           <el-form-item label="女生人数" class="flex1">
             <el-input-number
@@ -224,6 +230,7 @@ async function handleGenerate() {
               :min="0"
               :max="10"
               controls-position="right"
+              style="width: 100%"
             />
           </el-form-item>
         </div>

@@ -80,3 +80,21 @@ class TeamEventUpdate(BaseModel):
     """更新班级报名的团队项目集合。"""
 
     event_ids: list[int] = Field(default_factory=list)
+
+
+# ---------- 项目报名名单 ----------
+class EventRegistrationEntry(BaseModel):
+    """一条项目报名记录。团队项目仅有班级信息；个人项目附带姓名+号码。"""
+
+    class_id: int
+    grade: str
+    class_name: str
+    athlete_name: str | None = None
+    number: int | None = None
+
+
+class EventRegistrationList(BaseModel):
+    event_id: int
+    event_name: str
+    is_team: bool
+    entries: list[EventRegistrationEntry] = Field(default_factory=list)

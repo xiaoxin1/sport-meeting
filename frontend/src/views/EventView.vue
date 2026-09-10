@@ -9,6 +9,7 @@ import {
   type Event,
   type EventInput,
 } from "@/api/events";
+import { getEventRegistrations, type EventRegistrationList } from "@/api/registration";
 import { GENDERS, GRADE_GROUPS } from "@/config/constants";
 import { useAcademicYearStore } from "@/stores/academicYear";
 
@@ -120,6 +121,25 @@ async function handleDelete(row: Event) {
 function genderTag(g: string) {
   return g === "男" ? "" : g === "女" ? "danger" : "warning";
 }
+
+// ---- 报名详情 ----
+const regDialog = ref(false);
+const regLoading = ref(false);
+const regData = ref<EventRegistrationList | null>(null);
+
+async function openRegistrations(row: Event) {
+  regDialog.value = true;
+  regLoading.value = true;
+  regData.value = null;
+  try {
+    regData.value = await getEventRegistrations(row.id);
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "加载报名名单失败");
+    regDialog.value = false;
+  } finally {
+    regLoading.value = false;
+  }
+}
 </script>
 
 <template>
@@ -218,8 +238,9 @@ function genderTag(g: string) {
             <span :class="{ muted: !row.description }">{{ row.description || "—" }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="160">
+        <el-table-column label="操作" min-width="200">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openRegistrations(row)">报名详情</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -284,6 +305,36 @@ function genderTag(g: string) {
         <el-button type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="regDialog"
+      :title="regData ? `报名名单 · ${regData.event_name}` : '报名名单'"
+      width="560px"
+    >
+      <div v-loading="regLoading">
+        <template v-if="regData">
+          <p class="reg-tip">
+            {{ regData.is_team ? "团队项目 · 报名班级" : "个人项目 · 报名学生" }}
+            （共 {{ regData.entries.length }} 条）
+          </p>
+          <el-table :data="regData.entries" stripe border max-height="440">
+            <el-table-column label="班级" min-width="140">
+              <template #default="{ row }">{{ row.grade }}{{ row.class_name }}</template>
+            </el-table-column>
+            <template v-if="!regData.is_team">
+              <el-table-column label="姓名" prop="athlete_name" min-width="120" />
+              <el-table-column label="号码" min-width="100">
+                <template #default="{ row }">
+                  <span v-if="row.number">{{ row.number }}</span>
+                  <span v-else class="muted">未生成</span>
+                </template>
+              </el-table-column>
+            </template>
+            <template #empty>暂无报名</template>
+          </el-table>
+        </template>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -324,6 +375,11 @@ function genderTag(g: string) {
   color: var(--sfls-text-secondary);
 }
 .muted {
+  color: var(--sfls-text-secondary);
+}
+.reg-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
   color: var(--sfls-text-secondary);
 }
 /* 单元格内容超出列宽时换行显示，而非截断 */

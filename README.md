@@ -101,6 +101,12 @@ docker compose up -d --build
 
 ## 变更记录
 
+### v0.3.1 — 报名/项目细节调整
+- 修复报名手动添加对话框中「女生人数」输入框超出边框（`el-input-number` 宽度限定为 100%）。
+- 项目操作列新增「报名详情」：点击查看该项目的报名名单。团队项目显示报名班级；个人项目显示班级 + 姓名 + 号码。
+- 后端新增 `GET /registration/events/{event_id}/registrations`（按项目类型返回不同粒度名单，学年隔离，跨学年 404）；前端 `EventView` 增加名单对话框。
+- 验证：Docker 实跑，个人项目名单返回「班级+姓名+号码」，团队项目名单返回「班级」，均正确。
+
 ### v0.3.0 — 报名 (需求 5，第一阶段)
 - 后端：新增 `ClassTeam / Athlete / AthleteEvent / ClassTeamEvent` 模型（学年隔离、级联删除、唯一约束）；`registration` schema 与路由（班级 CRUD、班级详情、学生个人报名 CRUD、团队项目集合更新、一键生成号码）；`services/numbering.py` 号码生成（301 起、每班 10+10、按规范年级顺序排序）。
 - 前端：新增 `RegistrationView`（班级表格 + 手动添加 + 生成号码）、`RegistrationDetail` 抽屉（个人报名表格 + 团队项目多选）、`registration` API；启用侧边栏「报名」入口。
