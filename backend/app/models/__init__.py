@@ -3,5 +3,15 @@ from app.models.user import User
 from app.models.academic_year import AcademicYear
 from app.models.setting import AppSetting
 from app.models.event import Event
+from app.models.registration import ClassTeam, Athlete, AthleteEvent, ClassTeamEvent
 
-__all__ = ["User", "AcademicYear", "AppSetting", "Event"]
+__all__ = [
+    "User",
+    "AcademicYear",
+    "AppSetting",
+    "Event",
+    "ClassTeam",
+    "Athlete",
+    "AthleteEvent",
+    "ClassTeamEvent",
+]
