@@ -2,5 +2,6 @@
 from app.models.user import User
 from app.models.academic_year import AcademicYear
 from app.models.setting import AppSetting
+from app.models.event import Event
 
-__all__ = ["User", "AcademicYear", "AppSetting"]
+__all__ = ["User", "AcademicYear", "AppSetting", "Event"]

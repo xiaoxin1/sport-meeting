@@ -23,6 +23,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/AcademicYearView.vue"),
         meta: { title: "学年设置" },
       },
+      {
+        path: "events",
+        name: "events",
+        component: () => import("@/views/EventView.vue"),
+        meta: { title: "项目" },
+      },
     ],
   },
   { path: "/:pathMatch(.*)*", redirect: "/" },

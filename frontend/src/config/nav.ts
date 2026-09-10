@@ -8,7 +8,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { index: "/academic-years", title: "学年设置", icon: "Calendar" },
-  { index: "/events", title: "项目", icon: "Trophy", disabled: true },
+  { index: "/events", title: "项目", icon: "Trophy" },
   { index: "/registration", title: "报名", icon: "User", disabled: true },
   { index: "/schedule", title: "竞赛日程", icon: "Clock", disabled: true },
   { index: "/groupings", title: "项目分组", icon: "Grid", disabled: true },
