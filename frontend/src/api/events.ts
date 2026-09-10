@@ -8,7 +8,6 @@ export interface Event {
   name: string;
   group_name: string;
   gender: Gender;
-  max_teams: number;
   final_teams: number;
   is_team: boolean;
   description: string;
@@ -19,7 +18,6 @@ export interface EventInput {
   name: string;
   group_name: string;
   gender: Gender;
-  max_teams: number;
   final_teams: number;
   is_team: boolean;
   description: string;

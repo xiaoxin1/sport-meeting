@@ -25,7 +25,6 @@ const form = reactive<EventInput>({
   name: "",
   group_name: "",
   gender: "男",
-  max_teams: 0,
   final_teams: 0,
   is_team: false,
   description: "",
@@ -67,7 +66,6 @@ function openCreate() {
     name: "",
     group_name: "",
     gender: "男",
-    max_teams: 0,
     final_teams: 0,
     is_team: false,
     description: "",
@@ -81,7 +79,6 @@ function openEdit(row: Event) {
     name: row.name,
     group_name: row.group_name,
     gender: row.gender,
-    max_teams: row.max_teams,
     final_teams: row.final_teams,
     is_team: row.is_team,
     description: row.description,
@@ -93,10 +90,6 @@ async function submit() {
   if (!formRef.value) return;
   await formRef.value.validate(async (valid) => {
     if (!valid) return;
-    if (form.max_teams && form.final_teams && form.final_teams > form.max_teams) {
-      ElMessage.error("决赛队伍数不能大于上限队伍数");
-      return;
-    }
     try {
       if (editingId.value === null) {
         await createEvent({ ...form });
@@ -166,37 +159,66 @@ function genderTag(g: string) {
         <span class="count">共 {{ filtered.length }} 个项目</span>
       </div>
 
-      <el-table :data="filtered" v-loading="loading" stripe>
-        <el-table-column label="项目名称" prop="name" min-width="140" />
-        <el-table-column label="组别" prop="group_name" width="90" />
-        <el-table-column label="性别" width="80">
+      <el-table
+        :data="filtered"
+        v-loading="loading"
+        stripe
+        :default-sort="{ prop: 'name', order: 'ascending' }"
+      >
+        <el-table-column
+          label="项目名称"
+          prop="name"
+          min-width="160"
+          sortable
+          :sort-method="(a: Event, b: Event) => a.name.localeCompare(b.name, 'zh')"
+        />
+        <el-table-column
+          label="组别"
+          prop="group_name"
+          min-width="160"
+          sortable
+          :sort-method="(a: Event, b: Event) => a.group_name.localeCompare(b.group_name, 'zh')"
+        />
+        <el-table-column
+          label="性别"
+          prop="gender"
+          min-width="160"
+          sortable
+          :sort-method="(a: Event, b: Event) => a.gender.localeCompare(b.gender, 'zh')"
+        >
           <template #default="{ row }">
             <el-tag :type="genderTag(row.gender)" size="small" effect="light">
               {{ row.gender }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="90">
+        <el-table-column
+          label="类型"
+          prop="is_team"
+          min-width="160"
+          sortable
+          :sort-method="(a: Event, b: Event) => Number(a.is_team) - Number(b.is_team)"
+        >
           <template #default="{ row }">
             {{ row.is_team ? "团队" : "个人" }}
           </template>
         </el-table-column>
-        <el-table-column label="上限队伍" width="90" align="center">
-          <template #default="{ row }">
-            {{ row.max_teams || "不限" }}
-          </template>
-        </el-table-column>
-        <el-table-column label="决赛队伍" width="90" align="center">
+        <el-table-column
+          label="决赛队伍"
+          prop="final_teams"
+          min-width="160"
+          sortable
+        >
           <template #default="{ row }">
             {{ row.final_teams || "—" }}
           </template>
         </el-table-column>
-        <el-table-column label="项目介绍" prop="description" min-width="160" show-overflow-tooltip>
+        <el-table-column label="项目介绍" prop="description" min-width="160">
           <template #default="{ row }">
             <span :class="{ muted: !row.description }">{{ row.description || "—" }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="130" align="right">
+        <el-table-column label="操作" min-width="160">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
@@ -243,12 +265,9 @@ function genderTag(g: string) {
           </el-form-item>
         </div>
         <div class="form-row">
-          <el-form-item label="上限队伍" class="flex1">
-            <el-input-number v-model="form.max_teams" :min="0" controls-position="right" />
-            <span class="hint">0 表示不限</span>
-          </el-form-item>
           <el-form-item label="决赛队伍" class="flex1">
             <el-input-number v-model="form.final_teams" :min="0" controls-position="right" />
+            <span class="hint">报名队伍数低于此值直接决赛，否则增加预赛</span>
           </el-form-item>
         </div>
         <el-form-item label="项目介绍">
@@ -306,5 +325,11 @@ function genderTag(g: string) {
 }
 .muted {
   color: var(--sfls-text-secondary);
+}
+/* 单元格内容超出列宽时换行显示，而非截断 */
+.table-card :deep(.el-table .cell) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.5;
 }
 </style>
