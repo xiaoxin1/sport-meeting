@@ -101,6 +101,20 @@ docker compose up -d --build
 
 ## 变更记录
 
+### v0.4.0 — 竞赛日程 (需求 6，含项目分组与成绩录入)
+- **后端**：
+  - 新增 `ScheduleConfig / ScheduleEntry / ScheduleGroup / ScheduleLane` 四表模型（学年隔离、级联删除）。
+  - 新增 `services/schedule_rules.py`（默认强规则与软规则文本）、`services/schedule_gen.py`（确定性分组生成：小学/初高中半天槽位分配、预赛决赛阈值判断、组数与分道填充）、`services/schedule_ai.py`（DeepSeek 优化接口封装，仅调整时间顺序不改分组）、`services/schedule_finals.py`（从预赛成绩生成决赛名单）、`services/deepseek.py`（DeepSeek API 封装，支持配置中心覆盖 key/base_url）。
+  - 新增 `schedule` 路由：配置读写、`POST /generate`（重新生成日程，清空 AI 历史）、`POST /ai-optimize`（追加用户要求到 AI 历史并优化）、`GET /schedule`（返回配置+分段+分组+选手信息）、`GET /entries/{id}`（详情含分组分道与选手姓名/号码/班级）、`PUT /entries/{id}/results`（成绩录入）、`POST /entries/{id}/build-finals`（预赛生成决赛名单）。
+- **前端**：
+  - 新增 `api/schedule.ts`（完整接口封装）。
+  - 新增 `views/ScheduleView.vue`（主视图）：配置面板（天数 2/3、跑道数、强规则、软规则可编辑）、「重新生成」与「AI 优化」双确认按钮、按半天分段的日程表（大标题显示日期，列：序号/项目名称/组别/性别/类型/赛次/组数(几组/取几名)/时间/详情）。
+  - 新增 `views/schedule/ScheduleDetail.vue`（详情抽屉）：显示赛次元信息、分组分道表格（分道/号码/姓名/年级班级/成绩/名次），内联成绩录入（el-input + el-input-number），「保存成绩」按钮，预赛时显示「生成决赛名单」按钮（双确认）。
+  - 启用侧边栏「竞赛日程」，移除「项目分组」与「成绩统计」独立导航（按需求合并到日程模块）。
+- **验证**：
+  - 重新生成产生 220 条赛次（当前测试数据仅覆盖小学年级，故全部在 day 1），分组 4 组 × 8 道 = 32 条 lane，姓名/号码/班级完整填充。
+  - 配置/生成/获取/详情 API 均通过；DeepSeek 配置项已添加到后端（实际优化需用户配置真实 API key）。
+
 ### v0.3.6 — 号码生成顺序对齐表格排序
 - 修复：生成号码时班级顺序与报名表格默认排序不一致（此前按班级名称字符串排，导致「10班」排在「2班」前）。号码生成改用与表格一致的「年级(规范) + 班级(数字优先)」顺序。
 - 将 `_class_key` 收敛到 `services/numbering.py` 作为单一实现，`registration` 路由复用，避免重复。
