@@ -14,4 +14,5 @@ export const navItems: NavItem[] = [
   { index: "/records", title: "最高记录", icon: "Medal", disabled: true },
   { index: "/handbook", title: "秩序册生成", icon: "Document", disabled: true },
   { index: "/scores", title: "分数统计", icon: "Histogram", disabled: true },
+  { index: "/settings", title: "系统设置", icon: "Setting" },
 ];

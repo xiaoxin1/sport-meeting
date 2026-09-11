@@ -3,7 +3,7 @@ import axios from "axios";
 /** 统一 axios 实例：注入 token、集中处理 401。 */
 const client = axios.create({
   baseURL: "/api",
-  timeout: 30000,
+  timeout: 300000, // 增加到5分钟，AI优化需要较长时间
 });
 
 client.interceptors.request.use((config) => {

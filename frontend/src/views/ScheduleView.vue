@@ -224,33 +224,33 @@ function typeLabel(row: ScheduleEntry) {
       <div class="section-title">{{ sec.label }}</div>
       <el-table :data="sec.rows" border stripe size="default" class="sched-table">
         <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column prop="event_name" label="项目名称" width="110" show-overflow-tooltip />
-        <el-table-column prop="group_name" label="组别" width="100" />
-        <el-table-column prop="gender" label="性别" width="70" align="center" />
-        <el-table-column label="类型" width="70" align="center">
+        <el-table-column prop="event_name" label="项目名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="group_name" label="组别" min-width="120" />
+        <el-table-column prop="gender" label="性别" min-width="120" align="center" />
+        <el-table-column label="类型" min-width="120" align="center">
           <template #default="{ row }">{{ typeLabel(row) }}</template>
         </el-table-column>
-        <el-table-column label="赛次" width="80" align="center">
+        <el-table-column label="赛次" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="roundTag(row.round_type)" effect="light" size="small">{{ row.round_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="组数" width="120" align="center">
+        <el-table-column label="组数" min-width="120" align="center">
           <template #default="{ row }">{{ groupLabel(row) }}</template>
         </el-table-column>
-        <el-table-column label="时间" width="160" align="center">
+        <el-table-column label="时间" min-width="120" align="center">
           <template #default="{ row }">
             <span v-if="row.start_time">{{ row.start_time }} - {{ row.end_time }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="场地" width="100" align="center">
+        <el-table-column label="场地" min-width="120" align="center">
           <template #default="{ row }">
             <span v-if="row.venue">{{ row.venue }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="130" align="center" fixed="right">
+        <el-table-column label="操作" min-width="120" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="editEntry(row)">编辑</el-button>
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>

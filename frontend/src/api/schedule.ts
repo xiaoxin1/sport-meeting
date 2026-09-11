@@ -90,7 +90,9 @@ export async function regenerate(): Promise<ScheduleConfig> {
 }
 
 export async function aiOptimize(message: string): Promise<ScheduleConfig> {
-  const { data } = await client.post<ScheduleConfig>("/schedule/ai-optimize", { message });
+  const { data } = await client.post<ScheduleConfig>("/schedule/ai-optimize", { message }, {
+    timeout: 300000, // AI优化需要5分钟超时时间
+  });
   return data;
 }
 

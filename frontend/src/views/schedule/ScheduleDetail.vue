@@ -177,9 +177,9 @@ async function handleBuildFinals() {
         <div v-for="g in detail.groups" :key="g.id" class="group">
           <h4>第 {{ g.group_no }} 组</h4>
           <el-table :data="g.lanes" size="small" border stripe>
-            <el-table-column label="分道" prop="lane_no" width="60" align="center" />
+            <el-table-column label="分道" prop="lane_no" width="70" align="center" />
             <template v-if="!detail.is_team">
-              <el-table-column label="号码" width="70">
+              <el-table-column label="号码" min-width="120">
                 <template #default="{ row }">
                   <template v-if="editingLaneId === row.id">
                     <el-select
@@ -201,15 +201,15 @@ async function handleBuildFinals() {
                   <template v-else>{{ row.number }}</template>
                 </template>
               </el-table-column>
-              <el-table-column label="姓名" width="90">
+              <el-table-column label="姓名" min-width="120">
                 <template #default="{ row }">{{ row.athlete_name }}</template>
               </el-table-column>
-              <el-table-column label="年级班级" width="110">
+              <el-table-column label="年级班级" min-width="120">
                 <template #default="{ row }">{{ row.grade }}{{ row.class_name }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column label="班级" width="120">
+              <el-table-column label="班级" min-width="120">
                 <template #default="{ row }">
                   <template v-if="editingLaneId === row.id">
                     <el-select
@@ -232,7 +232,7 @@ async function handleBuildFinals() {
                 </template>
               </el-table-column>
             </template>
-            <el-table-column label="成绩" width="120">
+            <el-table-column label="成绩" min-width="120">
               <template #default="{ row }">
                 <template v-if="editingLaneId === row.id">
                   <el-input
@@ -244,7 +244,7 @@ async function handleBuildFinals() {
                 <template v-else>{{ row.result || "-" }}</template>
               </template>
             </el-table-column>
-            <el-table-column label="名次" width="90">
+            <el-table-column label="名次" min-width="120">
               <template #default="{ row }">
                 <template v-if="editingLaneId === row.id">
                   <el-input-number
@@ -258,7 +258,7 @@ async function handleBuildFinals() {
                 <template v-else>{{ row.rank || "-" }}</template>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" align="center">
+            <el-table-column label="操作" min-width="120" align="center">
               <template #default="{ row }">
                 <template v-if="editingLaneId === row.id">
                   <el-button
