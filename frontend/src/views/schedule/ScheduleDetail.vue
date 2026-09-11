@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   buildFinals,
@@ -7,8 +7,6 @@ import {
   updateLanes,
   updateResults,
   type EntryDetail,
-  type LaneResult,
-  type LaneUpdate,
 } from "@/api/schedule";
 import { listClasses, listAthletes } from "@/api/registration";
 
@@ -32,6 +30,13 @@ const saving = ref(false);
 const building = ref(false);
 const athletes = ref<Array<{ id: number; name: string; number: string; grade: string; class_name: string }>>([]);
 const classes = ref<Array<{ id: number; grade: string; class_name: string; label: string }>>([]);
+const editingLaneId = ref<number | null>(null);
+const editForm = reactive({
+  athlete_id: null as number | null,
+  class_team_id: null as number | null,
+  result: "",
+  rank: null as number | null,
+});
 
 const isPrelim = computed(() => detail.value?.round_type === "预赛");
 const title = computed(() =>
@@ -45,25 +50,6 @@ async function load() {
   loading.value = true;
   try {
     detail.value = await getEntryDetail(props.entryId);
-    // 加载选手/班级数据供编辑用
-    if (detail.value.is_team) {
-      const classList = await listClasses();
-      classes.value = classList.map((c: any) => ({
-        id: c.id,
-        grade: c.grade,
-        class_name: c.class_name,
-        label: `${c.grade}${c.class_name}`,
-      }));
-    } else {
-      const athleteList = await listAthletes();
-      athletes.value = athleteList.map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        number: a.number || "",
-        grade: a.grade,
-        class_name: a.class_name,
-      }));
-    }
   } finally {
     loading.value = false;
   }
@@ -76,42 +62,65 @@ watch(
   },
 );
 
-async function save() {
+async function loadOptionsIfNeeded() {
   if (!detail.value) return;
-  const results: LaneResult[] = [];
-  for (const g of detail.value.groups) {
-    for (const ln of g.lanes) {
-      results.push({ lane_id: ln.id, result: ln.result, rank: ln.rank });
-    }
-  }
-  saving.value = true;
-  try {
-    detail.value = await updateResults(detail.value.id, results);
-    ElMessage.success("成绩已保存");
-    emit("refreshed");
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || "保存失败");
-  } finally {
-    saving.value = false;
+  // 懒加载选手/班级数据
+  if (detail.value.is_team && classes.value.length === 0) {
+    const classList = await listClasses();
+    classes.value = classList.map((c: any) => ({
+      id: c.id,
+      grade: c.grade,
+      class_name: c.class_name,
+      label: `${c.grade}${c.class_name}`,
+    }));
+  } else if (!detail.value.is_team && athletes.value.length === 0) {
+    const athleteList = await listAthletes();
+    athletes.value = athleteList.map((a: any) => ({
+      id: a.id,
+      name: a.name,
+      number: a.number || "",
+      grade: a.grade,
+      class_name: a.class_name,
+    }));
   }
 }
 
-async function saveLanes() {
+function startEdit(row: any) {
+  editingLaneId.value = row.id;
+  editForm.athlete_id = row.athlete_id;
+  editForm.class_team_id = row.class_team_id;
+  editForm.result = row.result || "";
+  editForm.rank = row.rank;
+  loadOptionsIfNeeded();
+}
+
+function cancelEdit() {
+  editingLaneId.value = null;
+}
+
+async function saveLane(row: any) {
   if (!detail.value) return;
-  const lanes: LaneUpdate[] = [];
-  for (const g of detail.value.groups) {
-    for (const ln of g.lanes) {
-      lanes.push({
-        lane_id: ln.id,
-        athlete_id: ln.athlete_id,
-        class_team_id: ln.class_team_id,
-      });
-    }
-  }
   saving.value = true;
   try {
-    detail.value = await updateLanes(detail.value.id, lanes);
-    ElMessage.success("分组已保存");
+    // 同时更新分道选手和成绩
+    const laneUpdate = {
+      lane_id: row.id,
+      athlete_id: editForm.athlete_id,
+      class_team_id: editForm.class_team_id,
+    };
+    const resultUpdate = {
+      lane_id: row.id,
+      result: editForm.result,
+      rank: editForm.rank,
+    };
+
+    // 先更新分道
+    await updateLanes(detail.value.id, [laneUpdate]);
+    // 再更新成绩
+    detail.value = await updateResults(detail.value.id, [resultUpdate]);
+
+    editingLaneId.value = null;
+    ElMessage.success("已保存");
     emit("refreshed");
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || "保存失败");
@@ -162,69 +171,111 @@ async function handleBuildFinals() {
             >
               生成决赛名单
             </el-button>
-            <el-button type="success" :loading="saving" @click="saveLanes">保存分组</el-button>
-            <el-button type="primary" :loading="saving" @click="save">保存成绩</el-button>
           </div>
         </div>
 
         <div v-for="g in detail.groups" :key="g.id" class="group">
           <h4>第 {{ g.group_no }} 组</h4>
           <el-table :data="g.lanes" size="small" border stripe>
-            <el-table-column label="分道" prop="lane_no" width="70" align="center" />
+            <el-table-column label="分道" prop="lane_no" width="60" align="center" />
             <template v-if="!detail.is_team">
-              <el-table-column label="选手" min-width="200">
+              <el-table-column label="号码" width="70">
                 <template #default="{ row }">
-                  <el-select
-                    v-model="row.athlete_id"
-                    filterable
-                    clearable
-                    placeholder="选择选手"
-                    size="small"
-                  >
-                    <el-option
-                      v-for="a in athletes"
-                      :key="a.id"
-                      :label="`${a.number} ${a.name} (${a.grade}${a.class_name})`"
-                      :value="a.id"
-                    />
-                  </el-select>
+                  <template v-if="editingLaneId === row.id">
+                    <el-select
+                      v-model="editForm.athlete_id"
+                      filterable
+                      clearable
+                      placeholder="选择选手"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="a in athletes"
+                        :key="a.id"
+                        :label="`${a.number} ${a.name} (${a.grade}${a.class_name})`"
+                        :value="a.id"
+                      />
+                    </el-select>
+                  </template>
+                  <template v-else>{{ row.number }}</template>
                 </template>
+              </el-table-column>
+              <el-table-column label="姓名" width="90">
+                <template #default="{ row }">{{ row.athlete_name }}</template>
+              </el-table-column>
+              <el-table-column label="年级班级" width="110">
+                <template #default="{ row }">{{ row.grade }}{{ row.class_name }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column label="班级" min-width="200">
+              <el-table-column label="班级" width="120">
                 <template #default="{ row }">
-                  <el-select
-                    v-model="row.class_team_id"
-                    filterable
-                    clearable
-                    placeholder="选择班级"
-                    size="small"
-                  >
-                    <el-option
-                      v-for="c in classes"
-                      :key="c.id"
-                      :label="c.label"
-                      :value="c.id"
-                    />
-                  </el-select>
+                  <template v-if="editingLaneId === row.id">
+                    <el-select
+                      v-model="editForm.class_team_id"
+                      filterable
+                      clearable
+                      placeholder="选择班级"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="c in classes"
+                        :key="c.id"
+                        :label="c.label"
+                        :value="c.id"
+                      />
+                    </el-select>
+                  </template>
+                  <template v-else>{{ row.grade }}{{ row.class_name }}</template>
                 </template>
               </el-table-column>
             </template>
-            <el-table-column label="成绩" min-width="140">
+            <el-table-column label="成绩" width="120">
               <template #default="{ row }">
-                <el-input v-model="row.result" size="small" placeholder="如 13.20 / 1.65m" />
+                <template v-if="editingLaneId === row.id">
+                  <el-input
+                    v-model="editForm.result"
+                    size="small"
+                    placeholder="如 13.20"
+                  />
+                </template>
+                <template v-else>{{ row.result || "-" }}</template>
               </template>
             </el-table-column>
-            <el-table-column label="名次" width="110">
+            <el-table-column label="名次" width="90">
               <template #default="{ row }">
-                <el-input-number
-                  v-model="row.rank"
-                  size="small"
-                  :min="1"
-                  controls-position="right"
-                  style="width: 90px"
-                />
+                <template v-if="editingLaneId === row.id">
+                  <el-input-number
+                    v-model="editForm.rank"
+                    size="small"
+                    :min="1"
+                    controls-position="right"
+                    style="width: 100%"
+                  />
+                </template>
+                <template v-else>{{ row.rank || "-" }}</template>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150" align="center">
+              <template #default="{ row }">
+                <template v-if="editingLaneId === row.id">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="saving"
+                    @click="saveLane(row)"
+                  >
+                    保存
+                  </el-button>
+                  <el-button size="small" @click="cancelEdit">取消</el-button>
+                </template>
+                <template v-else>
+                  <el-button type="primary" size="small" link @click="startEdit(row)">
+                    编辑
+                  </el-button>
+                </template>
               </template>
             </el-table-column>
             <template #empty>本组暂无选手</template>

@@ -224,7 +224,7 @@ function typeLabel(row: ScheduleEntry) {
       <div class="section-title">{{ sec.label }}</div>
       <el-table :data="sec.rows" border stripe size="default" class="sched-table">
         <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column prop="event_name" label="项目名称" min-width="140" />
+        <el-table-column prop="event_name" label="项目名称" width="110" show-overflow-tooltip />
         <el-table-column prop="group_name" label="组别" width="100" />
         <el-table-column prop="gender" label="性别" width="70" align="center" />
         <el-table-column label="类型" width="70" align="center">
