@@ -24,7 +24,7 @@ from app.schemas.registration import (
     EventRegistrationList,
     TeamEventUpdate,
 )
-from app.services.numbering import generate_numbers
+from app.services.numbering import _grade_key, generate_numbers
 
 router = APIRouter(
     prefix="/registration",
@@ -216,6 +216,14 @@ def update_team_events(
 
 
 # ---------- 项目报名名单 ----------
+def _class_key(class_name: str) -> tuple[int, str]:
+    """班级排序键：优先按其中的数字（如「10班」→10），无数字则按名称。"""
+    digits = "".join(ch for ch in class_name if ch.isdigit())
+    if digits:
+        return (int(digits), "")
+    return (10**9, class_name)
+
+
 @router.get("/events/{event_id}/registrations", response_model=EventRegistrationList)
 def event_registrations(
     event_id: int,
@@ -233,7 +241,6 @@ def event_registrations(
             db.query(ClassTeam)
             .join(ClassTeamEvent, ClassTeamEvent.class_team_id == ClassTeam.id)
             .filter(ClassTeamEvent.event_id == event_id)
-            .order_by(ClassTeam.grade, ClassTeam.class_name)
             .all()
         )
         entries = [
@@ -249,7 +256,6 @@ def event_registrations(
             .join(AthleteEvent, AthleteEvent.athlete_id == Athlete.id)
             .join(ClassTeam, ClassTeam.id == Athlete.class_team_id)
             .filter(AthleteEvent.event_id == event_id)
-            .order_by(ClassTeam.grade, ClassTeam.class_name, Athlete.number, Athlete.id)
             .all()
         )
         entries = [
@@ -262,6 +268,15 @@ def event_registrations(
             )
             for a, c in rows
         ]
+
+    # 固定按 年级 + 班级 + 姓名 排序（年级按规范顺序，班级按数字，姓名按中文）
+    entries.sort(
+        key=lambda e: (
+            _grade_key(e.grade),
+            _class_key(e.class_name),
+            e.athlete_name or "",
+        )
+    )
 
     return EventRegistrationList(
         event_id=event.id,
