@@ -18,8 +18,10 @@ from app.schemas.schedule import (
     AIOptimizeIn,
     EntryDetail,
     EntryOut,
+    EntryUpdate,
     GroupOut,
     LaneOut,
+    LaneUpdateIn,
     ResultsUpdate,
     ScheduleConfigOut,
     ScheduleConfigUpdate,
@@ -198,6 +200,29 @@ def _entry_out(e: ScheduleEntry, ev: Event) -> EntryOut:
 
 
 # ---------- 赛次详情（分组分道 + 成绩） ----------
+@router.put("/entries/{entry_id}", response_model=EntryOut)
+def update_entry(
+    entry_id: int,
+    payload: EntryUpdate,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """手动编辑赛次时间、场地等"""
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    e.day_index = payload.day_index
+    e.period = payload.period
+    e.order_no = payload.order_no
+    e.start_time = payload.start_time
+    e.end_time = payload.end_time
+    e.venue = payload.venue
+    db.commit()
+    db.refresh(e)
+    ev = db.get(Event, e.event_id)
+    return _entry_out(e, ev)
+
+
 @router.get("/entries/{entry_id}", response_model=EntryDetail)
 def get_entry_detail(
     entry_id: int,
@@ -241,6 +266,28 @@ def get_entry_detail(
 
 
 # ---------- 成绩录入 ----------
+@router.put("/entries/{entry_id}/lanes", response_model=EntryDetail)
+def update_lanes(
+    entry_id: int,
+    payload: list[LaneUpdateIn],
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """手动修改分道选手分配"""
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    valid_lane_ids = {ln.id for grp in e.groups for ln in grp.lanes}
+    for item in payload:
+        if item.lane_id not in valid_lane_ids:
+            continue
+        ln = db.get(ScheduleLane, item.lane_id)
+        ln.athlete_id = item.athlete_id
+        ln.class_team_id = item.class_team_id
+    db.commit()
+    return get_entry_detail(entry_id, year, db)
+
+
 @router.put("/entries/{entry_id}/results", response_model=EntryDetail)
 def update_results(
     entry_id: int,

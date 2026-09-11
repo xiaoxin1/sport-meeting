@@ -6,6 +6,7 @@ import {
   getSchedule,
   regenerate,
   updateConfig,
+  updateEntry,
   type ScheduleData,
   type ScheduleEntry,
 } from "@/api/schedule";
@@ -19,6 +20,17 @@ const busy = ref(false);
 
 const detailVisible = ref(false);
 const detailEntryId = ref<number | null>(null);
+
+const editDialog = ref(false);
+const editForm = reactive({
+  id: 0,
+  day_index: 1,
+  period: "上午",
+  order_no: 1,
+  start_time: "",
+  end_time: "",
+  venue: "",
+});
 
 const configDialog = ref(false);
 const aiDialog = ref(false);
@@ -144,6 +156,38 @@ function openDetail(row: ScheduleEntry) {
   detailVisible.value = true;
 }
 
+function editEntry(row: ScheduleEntry) {
+  editForm.id = row.id;
+  editForm.day_index = row.day_index;
+  editForm.period = row.period;
+  editForm.order_no = row.order_no;
+  editForm.start_time = row.start_time;
+  editForm.end_time = row.end_time;
+  editForm.venue = row.venue;
+  editDialog.value = true;
+}
+
+async function saveEntry() {
+  busy.value = true;
+  try {
+    await updateEntry(editForm.id, {
+      day_index: editForm.day_index,
+      period: editForm.period,
+      order_no: editForm.order_no,
+      start_time: editForm.start_time,
+      end_time: editForm.end_time,
+      venue: editForm.venue,
+    });
+    editDialog.value = false;
+    await load();
+    ElMessage.success("已保存");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "保存失败");
+  } finally {
+    busy.value = false;
+  }
+}
+
 function roundTag(t: string) {
   return t === "决赛" ? "danger" : "warning";
 }
@@ -179,34 +223,84 @@ function typeLabel(row: ScheduleEntry) {
     <div v-for="sec in sections" :key="sec.key" class="section">
       <div class="section-title">{{ sec.label }}</div>
       <el-table :data="sec.rows" border stripe size="default" class="sched-table">
-        <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="event_name" label="项目名称" min-width="160" />
-        <el-table-column prop="group_name" label="组别（年级）" width="130" />
-        <el-table-column prop="gender" label="性别" width="80" align="center" />
-        <el-table-column label="类型" width="90" align="center">
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="event_name" label="项目名称" min-width="140" />
+        <el-table-column prop="group_name" label="组别" width="100" />
+        <el-table-column prop="gender" label="性别" width="70" align="center" />
+        <el-table-column label="类型" width="70" align="center">
           <template #default="{ row }">{{ typeLabel(row) }}</template>
         </el-table-column>
-        <el-table-column label="赛次" width="90" align="center">
+        <el-table-column label="赛次" width="80" align="center">
           <template #default="{ row }">
-            <el-tag :type="roundTag(row.round_type)" effect="light">{{ row.round_type }}</el-tag>
+            <el-tag :type="roundTag(row.round_type)" effect="light" size="small">{{ row.round_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="组数" width="140" align="center">
+        <el-table-column label="组数" width="120" align="center">
           <template #default="{ row }">{{ groupLabel(row) }}</template>
         </el-table-column>
-        <el-table-column label="时间" width="140" align="center">
+        <el-table-column label="时间" width="160" align="center">
           <template #default="{ row }">
             <span v-if="row.start_time">{{ row.start_time }} - {{ row.end_time }}</span>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="详情" width="100" align="center" fixed="right">
+        <el-table-column label="场地" width="100" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row)">查看</el-button>
+            <span v-if="row.venue">{{ row.venue }}</span>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="130" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="editEntry(row)">编辑</el-button>
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
+
+    <!-- 编辑赛次 -->
+    <el-dialog v-model="editDialog" title="编辑赛次" width="560px">
+      <el-form :model="editForm" label-width="90px">
+        <el-form-item label="比赛天数">
+          <el-input-number v-model="editForm.day_index" :min="1" :max="3" />
+        </el-form-item>
+        <el-form-item label="时段">
+          <el-radio-group v-model="editForm.period">
+            <el-radio value="上午">上午</el-radio>
+            <el-radio value="下午">下午</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="顺序号">
+          <el-input-number v-model="editForm.order_no" :min="1" />
+        </el-form-item>
+        <el-form-item label="开始时间">
+          <el-time-select
+            v-model="editForm.start_time"
+            start="07:00"
+            end="18:00"
+            step="00:05"
+            placeholder="选择时间"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间">
+          <el-time-select
+            v-model="editForm.end_time"
+            start="07:00"
+            end="18:00"
+            step="00:05"
+            placeholder="选择时间"
+          />
+        </el-form-item>
+        <el-form-item label="场地">
+          <el-input v-model="editForm.venue" placeholder="例如：田径场、篮球场A" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialog = false">取消</el-button>
+        <el-button type="primary" :loading="busy" @click="saveEntry">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 规则配置 -->
     <el-dialog v-model="configDialog" title="规则配置" width="720px" top="6vh">

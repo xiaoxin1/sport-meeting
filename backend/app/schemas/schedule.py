@@ -15,6 +15,17 @@ class ScheduleConfigUpdate(ScheduleConfigBase):
     pass
 
 
+class EntryUpdate(BaseModel):
+    """赛次更新（手动编辑时间、场地等）"""
+
+    day_index: int = Field(ge=1, le=3)
+    period: str = Field(pattern="^(上午|下午)$")
+    order_no: int = Field(ge=1)
+    start_time: str = Field(max_length=5)
+    end_time: str = Field(max_length=5)
+    venue: str = Field(max_length=100)
+
+
 class ScheduleConfigOut(ScheduleConfigBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,6 +91,14 @@ class LaneResultIn(BaseModel):
     lane_id: int
     result: str = ""
     rank: int | None = None
+
+
+class LaneUpdateIn(BaseModel):
+    """手动修改分道选手"""
+
+    lane_id: int
+    athlete_id: int | None = None
+    class_team_id: int | None = None
 
 
 class ResultsUpdate(BaseModel):

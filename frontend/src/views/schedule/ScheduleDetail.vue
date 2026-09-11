@@ -4,9 +4,11 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import {
   buildFinals,
   getEntryDetail,
+  updateLanes,
   updateResults,
   type EntryDetail,
   type LaneResult,
+  type LaneUpdate,
 } from "@/api/schedule";
 
 const props = defineProps<{
@@ -72,6 +74,30 @@ async function save() {
   }
 }
 
+async function saveLanes() {
+  if (!detail.value) return;
+  const lanes: LaneUpdate[] = [];
+  for (const g of detail.value.groups) {
+    for (const ln of g.lanes) {
+      lanes.push({
+        lane_id: ln.id,
+        athlete_id: ln.athlete_id,
+        class_team_id: ln.class_team_id,
+      });
+    }
+  }
+  saving.value = true;
+  try {
+    detail.value = await updateLanes(detail.value.id, lanes);
+    ElMessage.success("分组已保存");
+    emit("refreshed");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "保存失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
 async function handleBuildFinals() {
   if (!detail.value) return;
   await ElMessageBox.confirm(
@@ -114,6 +140,7 @@ async function handleBuildFinals() {
             >
               生成决赛名单
             </el-button>
+            <el-button type="success" :loading="saving" @click="saveLanes">保存分组</el-button>
             <el-button type="primary" :loading="saving" @click="save">保存成绩</el-button>
           </div>
         </div>

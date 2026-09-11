@@ -18,6 +18,15 @@ export interface ScheduleConfigInput {
   soft_rules: string;
 }
 
+export interface EntryUpdateInput {
+  day_index: number;
+  period: string;
+  order_no: number;
+  start_time: string;
+  end_time: string;
+  venue: string;
+}
+
 export interface ScheduleEntry {
   id: number;
   event_id: number;
@@ -90,6 +99,11 @@ export async function getSchedule(): Promise<ScheduleData> {
   return data;
 }
 
+export async function updateEntry(entryId: number, input: EntryUpdateInput): Promise<ScheduleEntry> {
+  const { data } = await client.put<ScheduleEntry>(`/schedule/entries/${entryId}`, input);
+  return data;
+}
+
 export async function getEntryDetail(entryId: number): Promise<EntryDetail> {
   const { data } = await client.get<EntryDetail>(`/schedule/entries/${entryId}`);
   return data;
@@ -99,6 +113,17 @@ export interface LaneResult {
   lane_id: number;
   result: string;
   rank: number | null;
+}
+
+export interface LaneUpdate {
+  lane_id: number;
+  athlete_id: number | null;
+  class_team_id: number | null;
+}
+
+export async function updateLanes(entryId: number, lanes: LaneUpdate[]): Promise<EntryDetail> {
+  const { data } = await client.put<EntryDetail>(`/schedule/entries/${entryId}/lanes`, lanes);
+  return data;
 }
 
 export async function updateResults(entryId: number, results: LaneResult[]): Promise<EntryDetail> {
