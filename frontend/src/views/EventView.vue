@@ -122,6 +122,12 @@ function genderTag(g: string) {
   return g === "男" ? "" : g === "女" ? "danger" : "warning";
 }
 
+// 班级完整显示：如「一年级1班」（class_name 未含「班」时补上）
+function classLabel(grade: string, className: string) {
+  const c = className?.trim() ?? "";
+  return c.endsWith("班") ? `${grade}${c}` : `${grade}${c}班`;
+}
+
 // ---- 报名详情 ----
 const regDialog = ref(false);
 const regLoading = ref(false);
@@ -319,7 +325,7 @@ async function openRegistrations(row: Event) {
           </p>
           <el-table :data="regData.entries" stripe border max-height="440">
             <el-table-column label="班级" min-width="140">
-              <template #default="{ row }">{{ row.grade }}{{ row.class_name }}</template>
+              <template #default="{ row }">{{ classLabel(row.grade, row.class_name) }}</template>
             </el-table-column>
             <template v-if="!regData.is_team">
               <el-table-column label="姓名" prop="athlete_name" min-width="120" />
