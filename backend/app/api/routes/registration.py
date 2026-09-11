@@ -24,7 +24,7 @@ from app.schemas.registration import (
     EventRegistrationList,
     TeamEventUpdate,
 )
-from app.services.numbering import _grade_key, generate_numbers
+from app.services.numbering import _class_key, _grade_key, generate_numbers
 
 router = APIRouter(
     prefix="/registration",
@@ -218,14 +218,6 @@ def update_team_events(
 
 
 # ---------- 项目报名名单 ----------
-def _class_key(class_name: str) -> tuple[int, str]:
-    """班级排序键：优先按其中的数字（如「10班」→10），无数字则按名称。"""
-    digits = "".join(ch for ch in class_name if ch.isdigit())
-    if digits:
-        return (int(digits), "")
-    return (10**9, class_name)
-
-
 @router.get("/events/{event_id}/registrations", response_model=EventRegistrationList)
 def event_registrations(
     event_id: int,

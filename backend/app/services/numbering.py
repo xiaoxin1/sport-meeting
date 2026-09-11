@@ -26,6 +26,17 @@ def _grade_key(grade: str) -> tuple[int, str]:
         return (len(GRADE_ORDER), grade)
 
 
+def _class_key(class_name: str) -> tuple[int, str]:
+    """班级排序键：优先按其中的数字（如「10班」→10），无数字则按名称。
+
+    与前端 naturalCompare / 报名表格排序保持一致。
+    """
+    digits = "".join(ch for ch in class_name if ch.isdigit())
+    if digits:
+        return (int(digits), "")
+    return (10**9, class_name)
+
+
 def generate_numbers(db: Session, academic_year_id: int) -> int:
     """为指定学年的所有班级重新生成号码。返回已分配号码的学生数。"""
     classes = (
@@ -33,7 +44,7 @@ def generate_numbers(db: Session, academic_year_id: int) -> int:
         .filter(ClassTeam.academic_year_id == academic_year_id)
         .all()
     )
-    classes.sort(key=lambda c: (_grade_key(c.grade), c.class_name))
+    classes.sort(key=lambda c: (_grade_key(c.grade), _class_key(c.class_name)))
 
     assigned = 0
     cursor = START_NUMBER
