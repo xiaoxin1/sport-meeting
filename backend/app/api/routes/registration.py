@@ -136,6 +136,18 @@ def _validate_person_events(event_ids: list[int], year: AcademicYear, db: Sessio
             raise HTTPException(status_code=400, detail=f"「{e.name}」是团队项目，不能作为个人项目报名")
 
 
+@router.get("/athletes", response_model=list[AthleteOut])
+def list_athletes(
+    year: AcademicYear = Depends(get_active_year), db: Session = Depends(get_db)
+):
+    """获取本学年所有选手（用于日程分组编辑）"""
+    cls_ids = [
+        c.id for c in db.query(ClassTeam).filter(ClassTeam.academic_year_id == year.id).all()
+    ]
+    athletes = db.query(Athlete).filter(Athlete.class_team_id.in_(cls_ids)).all()
+    return [_serialize_athlete(a, db) for a in athletes]
+
+
 @router.post(
     "/classes/{class_id}/athletes",
     response_model=AthleteOut,
@@ -297,6 +309,7 @@ def _athlete_event_ids(athlete_id: int, db: Session) -> list[int]:
 
 
 def _serialize_athlete(athlete: Athlete, db: Session) -> AthleteOut:
+    cls = db.get(ClassTeam, athlete.class_team_id)
     return AthleteOut(
         id=athlete.id,
         class_team_id=athlete.class_team_id,
@@ -304,6 +317,8 @@ def _serialize_athlete(athlete: Athlete, db: Session) -> AthleteOut:
         gender=athlete.gender,
         number=athlete.number,
         event_ids=_athlete_event_ids(athlete.id, db),
+        grade=cls.grade if cls else "",
+        class_name=cls.class_name if cls else "",
     )
 
 

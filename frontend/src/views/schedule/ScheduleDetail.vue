@@ -10,6 +10,7 @@ import {
   type LaneResult,
   type LaneUpdate,
 } from "@/api/schedule";
+import { listClasses, listAthletes } from "@/api/registration";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -29,6 +30,8 @@ const detail = ref<EntryDetail | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const building = ref(false);
+const athletes = ref<Array<{ id: number; name: string; number: string; grade: string; class_name: string }>>([]);
+const classes = ref<Array<{ id: number; grade: string; class_name: string; label: string }>>([]);
 
 const isPrelim = computed(() => detail.value?.round_type === "预赛");
 const title = computed(() =>
@@ -42,6 +45,25 @@ async function load() {
   loading.value = true;
   try {
     detail.value = await getEntryDetail(props.entryId);
+    // 加载选手/班级数据供编辑用
+    if (detail.value.is_team) {
+      const classList = await listClasses();
+      classes.value = classList.map((c: any) => ({
+        id: c.id,
+        grade: c.grade,
+        class_name: c.class_name,
+        label: `${c.grade}${c.class_name}`,
+      }));
+    } else {
+      const athleteList = await listAthletes();
+      athletes.value = athleteList.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        number: a.number || "",
+        grade: a.grade,
+        class_name: a.class_name,
+      }));
+    }
   } finally {
     loading.value = false;
   }
@@ -148,16 +170,47 @@ async function handleBuildFinals() {
         <div v-for="g in detail.groups" :key="g.id" class="group">
           <h4>第 {{ g.group_no }} 组</h4>
           <el-table :data="g.lanes" size="small" border stripe>
-            <el-table-column label="分道" prop="lane_no" width="70" />
+            <el-table-column label="分道" prop="lane_no" width="70" align="center" />
             <template v-if="!detail.is_team">
-              <el-table-column label="号码" prop="number" width="90" />
-              <el-table-column label="姓名" prop="athlete_name" min-width="100" />
+              <el-table-column label="选手" min-width="200">
+                <template #default="{ row }">
+                  <el-select
+                    v-model="row.athlete_id"
+                    filterable
+                    clearable
+                    placeholder="选择选手"
+                    size="small"
+                  >
+                    <el-option
+                      v-for="a in athletes"
+                      :key="a.id"
+                      :label="`${a.number} ${a.name} (${a.grade}${a.class_name})`"
+                      :value="a.id"
+                    />
+                  </el-select>
+                </template>
+              </el-table-column>
             </template>
-            <el-table-column label="年级班级" min-width="130">
-              <template #default="{ row }">
-                {{ row.grade }}{{ row.class_name }}
-              </template>
-            </el-table-column>
+            <template v-else>
+              <el-table-column label="班级" min-width="200">
+                <template #default="{ row }">
+                  <el-select
+                    v-model="row.class_team_id"
+                    filterable
+                    clearable
+                    placeholder="选择班级"
+                    size="small"
+                  >
+                    <el-option
+                      v-for="c in classes"
+                      :key="c.id"
+                      :label="c.label"
+                      :value="c.id"
+                    />
+                  </el-select>
+                </template>
+              </el-table-column>
+            </template>
             <el-table-column label="成绩" min-width="140">
               <template #default="{ row }">
                 <el-input v-model="row.result" size="small" placeholder="如 13.20 / 1.65m" />

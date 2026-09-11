@@ -68,6 +68,8 @@ class AthleteOut(BaseModel):
     gender: str
     number: int | None
     event_ids: list[int] = Field(default_factory=list)
+    grade: str = ""
+    class_name: str = ""
 
 
 # ---------- 班级详情（含学生 + 团队项目） ----------

@@ -26,6 +26,8 @@ export interface Athlete {
   gender: "男" | "女";
   number: number | null;
   event_ids: number[];
+  grade: string;
+  class_name: string;
 }
 
 export interface AthleteInput {
@@ -41,6 +43,11 @@ export interface ClassTeamDetail extends ClassTeam {
 
 export async function listClasses(): Promise<ClassTeam[]> {
   const { data } = await client.get<ClassTeam[]>("/registration/classes");
+  return data;
+}
+
+export async function listAthletes(): Promise<Athlete[]> {
+  const { data } = await client.get<Athlete[]>("/registration/athletes");
   return data;
 }
 
