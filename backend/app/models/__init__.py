@@ -4,6 +4,12 @@ from app.models.academic_year import AcademicYear
 from app.models.setting import AppSetting
 from app.models.event import Event
 from app.models.registration import ClassTeam, Athlete, AthleteEvent, ClassTeamEvent
+from app.models.schedule import (
+    ScheduleConfig,
+    ScheduleEntry,
+    ScheduleGroup,
+    ScheduleLane,
+)
 
 __all__ = [
     "User",
@@ -14,4 +20,8 @@ __all__ = [
     "Athlete",
     "AthleteEvent",
     "ClassTeamEvent",
+    "ScheduleConfig",
+    "ScheduleEntry",
+    "ScheduleGroup",
+    "ScheduleLane",
 ]
