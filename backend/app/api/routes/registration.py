@@ -45,12 +45,14 @@ def _get_class(class_id: int, year: AcademicYear, db: Session) -> ClassTeam:
 def list_classes(
     year: AcademicYear = Depends(get_active_year), db: Session = Depends(get_db)
 ):
-    return (
+    rows = (
         db.query(ClassTeam)
         .filter(ClassTeam.academic_year_id == year.id)
-        .order_by(ClassTeam.grade, ClassTeam.class_name)
         .all()
     )
+    # 固定按 年级(规范顺序) + 班级(数字优先) 排序
+    rows.sort(key=lambda c: (_grade_key(c.grade), _class_key(c.class_name)))
+    return rows
 
 
 @router.post("/classes", response_model=ClassTeamOut, status_code=status.HTTP_201_CREATED)

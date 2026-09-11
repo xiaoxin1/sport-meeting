@@ -11,6 +11,7 @@ import {
 } from "@/api/events";
 import { getEventRegistrations, type EventRegistrationList } from "@/api/registration";
 import { GENDERS, GRADE_GROUPS } from "@/config/constants";
+import { compareGrade, naturalCompare } from "@/config/sort";
 import { useAcademicYearStore } from "@/stores/academicYear";
 
 const yearStore = useAcademicYearStore();
@@ -196,14 +197,14 @@ async function openRegistrations(row: Event) {
           prop="name"
           min-width="160"
           sortable
-          :sort-method="(a: Event, b: Event) => a.name.localeCompare(b.name, 'zh')"
+          :sort-method="(a: Event, b: Event) => naturalCompare(a.name, b.name)"
         />
         <el-table-column
           label="组别"
           prop="group_name"
           min-width="160"
           sortable
-          :sort-method="(a: Event, b: Event) => a.group_name.localeCompare(b.group_name, 'zh')"
+          :sort-method="(a: Event, b: Event) => compareGrade(a.group_name, b.group_name)"
         />
         <el-table-column
           label="性别"

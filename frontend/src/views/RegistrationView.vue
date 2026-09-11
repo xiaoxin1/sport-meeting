@@ -12,6 +12,7 @@ import {
 } from "@/api/registration";
 import { listEvents, type Event } from "@/api/events";
 import { GRADE_GROUPS } from "@/config/constants";
+import { compareGrade, naturalCompare } from "@/config/sort";
 import { useAcademicYearStore } from "@/stores/academicYear";
 import RegistrationDetail from "./registration/RegistrationDetail.vue";
 
@@ -43,7 +44,12 @@ const detailClassId = ref<number | null>(null);
 async function load() {
   loading.value = true;
   try {
-    classes.value = await listClasses();
+    const data = await listClasses();
+    // 默认按 年级 + 班级 排序
+    data.sort(
+      (a, b) => compareGrade(a.grade, b.grade) || naturalCompare(a.class_name, b.class_name),
+    );
+    classes.value = data;
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || "加载失败");
   } finally {
@@ -166,9 +172,21 @@ async function handleGenerate() {
     />
 
     <div class="sfls-card table-card">
-      <el-table :data="classes" v-loading="loading" stripe :default-sort="{ prop: 'grade' }">
-        <el-table-column label="年级" prop="grade" min-width="140" sortable />
-        <el-table-column label="班级" prop="class_name" min-width="140" sortable />
+      <el-table :data="classes" v-loading="loading" stripe>
+        <el-table-column
+          label="年级"
+          prop="grade"
+          min-width="140"
+          sortable
+          :sort-method="(a: ClassTeam, b: ClassTeam) => compareGrade(a.grade, b.grade)"
+        />
+        <el-table-column
+          label="班级"
+          prop="class_name"
+          min-width="140"
+          sortable
+          :sort-method="(a: ClassTeam, b: ClassTeam) => naturalCompare(a.class_name, b.class_name)"
+        />
         <el-table-column label="领队姓名" prop="leader_name" min-width="140">
           <template #default="{ row }">
             <span :class="{ muted: !row.leader_name }">{{ row.leader_name || "—" }}</span>
