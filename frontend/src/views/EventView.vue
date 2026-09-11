@@ -46,10 +46,21 @@ const filtered = computed(() =>
   }),
 );
 
+const GENDER_ORDER = new Map(GENDERS.map((g, i) => [g, i]));
+
 async function load() {
   loading.value = true;
   try {
-    events.value = await listEvents();
+    const data = await listEvents();
+    // 默认按 组别 + 性别 + 类型 + 项目名称 排序
+    data.sort(
+      (a, b) =>
+        compareGrade(a.group_name, b.group_name) ||
+        (GENDER_ORDER.get(a.gender)! - GENDER_ORDER.get(b.gender)!) ||
+        (Number(a.is_team) - Number(b.is_team)) ||
+        naturalCompare(a.name, b.name),
+    );
+    events.value = data;
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || "加载失败");
   } finally {
@@ -186,12 +197,7 @@ async function openRegistrations(row: Event) {
         <span class="count">共 {{ filtered.length }} 个项目</span>
       </div>
 
-      <el-table
-        :data="filtered"
-        v-loading="loading"
-        stripe
-        :default-sort="{ prop: 'name', order: 'ascending' }"
-      >
+      <el-table :data="filtered" v-loading="loading" stripe>
         <el-table-column
           label="项目名称"
           prop="name"
