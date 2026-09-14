@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import {
   createClass,
@@ -21,6 +21,29 @@ const classes = ref<ClassTeam[]>([]);
 const events = ref<Event[]>([]);
 const loading = ref(false);
 const generating = ref(false);
+
+// 搜索与筛选
+const keyword = ref("");
+const filterGroup = ref("");
+
+const filteredClasses = computed(() =>
+  classes.value.filter((c) => {
+    const okKw = !keyword.value || (c.leader_name || "").includes(keyword.value);
+    const okGroup = !filterGroup.value || c.grade === filterGroup.value;
+    return okKw && okGroup;
+  }),
+);
+
+// 分页
+const currentPage = ref(1);
+const pageSize = ref(10);
+
+// 分页后的数据
+const paginatedClasses = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return filteredClasses.value.slice(start, end);
+});
 
 const dialogVisible = ref(false);
 const editingId = ref<number | null>(null);
@@ -172,7 +195,21 @@ async function handleGenerate() {
     />
 
     <div class="sfls-card table-card">
-      <el-table :data="classes" v-loading="loading" stripe>
+      <div class="toolbar">
+        <el-input
+          v-model="keyword"
+          placeholder="搜索领队姓名"
+          :prefix-icon="'Search'"
+          clearable
+          style="width: 220px"
+        />
+        <el-select v-model="filterGroup" placeholder="全部年级" clearable style="width: 160px">
+          <el-option v-for="g in GRADE_GROUPS" :key="g" :label="g" :value="g" />
+        </el-select>
+        <span class="count">共 {{ filteredClasses.length }} 个班级</span>
+      </div>
+
+      <el-table :data="paginatedClasses" v-loading="loading" stripe>
         <el-table-column
           label="年级"
           prop="grade"
@@ -203,6 +240,15 @@ async function handleGenerate() {
         </el-table-column>
         <template #empty>暂无班级，点击右上角「手动添加」开始。</template>
       </el-table>
+
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100, 1000]"
+        :total="filteredClasses.length"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
     </div>
 
     <!-- 班级新增/编辑 -->
@@ -283,6 +329,17 @@ async function handleGenerate() {
 }
 .table-card {
   padding: 16px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.toolbar .count {
+  margin-left: auto;
+  color: var(--sfls-text-secondary);
+  font-size: 13px;
 }
 .form-row {
   display: flex;

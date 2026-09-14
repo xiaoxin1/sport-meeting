@@ -160,7 +160,7 @@ async function handleBuildFinals() {
             <template v-if="detail.round_type === '预赛'">
               · 取前 {{ detail.advance_count }} 名进决赛
             </template>
-            · {{ detail.start_time }}-{{ detail.end_time }} · {{ detail.venue }}
+            · {{ detail.start_time || '未设置' }}-{{ detail.end_time || '未设置' }} · {{ detail.venue }}
           </span>
           <div class="ops">
             <el-button

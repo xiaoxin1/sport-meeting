@@ -28,6 +28,7 @@ from app.schemas.schedule import (
     ScheduleOut,
 )
 from app.services.schedule_ai import optimize_schedule
+from app.services.record_update import update_record_if_broken
 from app.services.schedule_finals import build_finals
 from app.services.schedule_gen import generate_schedule
 from app.services.schedule_rules import DEFAULT_HARD_RULES, DEFAULT_SOFT_RULES
@@ -298,13 +299,21 @@ def update_results(
     e = db.get(ScheduleEntry, entry_id)
     if e is None or e.academic_year_id != year.id:
         raise HTTPException(status_code=404, detail="赛次不存在")
+
+    ev = db.get(Event, e.event_id)
     valid_lane_ids = {ln.id for grp in e.groups for ln in grp.lanes}
+
     for item in payload.results:
         if item.lane_id not in valid_lane_ids:
             continue
         ln = db.get(ScheduleLane, item.lane_id)
         ln.result = item.result or ""
         ln.rank = item.rank
+
+        # 自动更新本年记录
+        if ln.result and ln.result.strip():
+            update_record_if_broken(db, ln)
+
     db.commit()
     return get_entry_detail(entry_id, year, db)
 

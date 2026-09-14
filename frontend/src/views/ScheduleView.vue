@@ -37,6 +37,17 @@ const aiDialog = ref(false);
 const aiMessage = ref("");
 const cfgForm = reactive({ days: 2, lanes: 8, hard_rules: "", soft_rules: "" });
 
+// 分页状态：为每个section维护独立的分页
+const sectionPages = ref<Record<string, { current: number; size: number }>>({});
+
+// 获取section的分页状态
+function getSectionPage(key: string) {
+  if (!sectionPages.value[key]) {
+    sectionPages.value[key] = { current: 1, size: 10 };
+  }
+  return sectionPages.value[key];
+}
+
 // 按 (day, period) 分段，保留顺序
 const sections = computed(() => {
   const out: { key: string; day: number; period: string; label: string; rows: ScheduleEntry[] }[] =
@@ -62,7 +73,40 @@ const sections = computed(() => {
   return out;
 });
 
+// 分页后的sections
+const paginatedSections = computed(() => {
+  return sections.value.map(sec => {
+    const page = getSectionPage(sec.key);
+    const start = (page.current - 1) * page.size;
+    const end = start + page.size;
+    return {
+      ...sec,
+      paginatedRows: sec.rows.slice(start, end),
+      total: sec.rows.length
+    };
+  });
+});
+
 const aiHistory = computed(() => data.value?.config?.ai_history || []);
+
+// 将UTC时间转换为本地时间显示
+const generatedAtLocal = computed(() => {
+  if (!data.value?.config?.generated_at) return null;
+  // 后端返回的是UTC时间字符串，需要加上Z标识表示UTC时区
+  const utcTimeString = data.value.config.generated_at.endsWith('Z')
+    ? data.value.config.generated_at
+    : data.value.config.generated_at + 'Z';
+  const utcDate = new Date(utcTimeString);
+  return utcDate.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+});
 
 async function load() {
   loading.value = true;
@@ -206,7 +250,7 @@ function typeLabel(row: ScheduleEntry) {
       <div>
         <h2 class="title">竞赛日程</h2>
         <p class="sub">
-          {{ data?.config?.generated_at ? `最近生成：${data.config.generated_at}` : "尚未生成日程" }}
+          {{ generatedAtLocal ? `最近生成：${generatedAtLocal}` : "尚未生成日程" }}
         </p>
       </div>
       <div class="actions">
@@ -220,9 +264,9 @@ function typeLabel(row: ScheduleEntry) {
 
     <el-empty v-if="!loading && !data?.entries.length" description="暂无日程，点击“重新生成”开始编排" />
 
-    <div v-for="sec in sections" :key="sec.key" class="section">
+    <div v-for="sec in paginatedSections" :key="sec.key" class="section">
       <div class="section-title">{{ sec.label }}</div>
-      <el-table :data="sec.rows" border stripe size="default" class="sched-table">
+      <el-table :data="sec.paginatedRows" border stripe size="default" class="sched-table">
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="event_name" label="项目名称" min-width="120" show-overflow-tooltip />
         <el-table-column prop="group_name" label="组别" min-width="120" />
@@ -257,6 +301,15 @@ function typeLabel(row: ScheduleEntry) {
           </template>
         </el-table-column>
       </el-table>
+
+      <el-pagination
+        v-model:current-page="getSectionPage(sec.key).current"
+        v-model:page-size="getSectionPage(sec.key).size"
+        :page-sizes="[10, 20, 50, 100, 1000]"
+        :total="sec.total"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
     </div>
 
     <!-- 编辑赛次 -->

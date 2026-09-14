@@ -11,6 +11,7 @@ engine = create_engine(
     pool_pre_ping=True,  # 断线自动重连，容器重启后仍可用
     pool_recycle=3600,
     echo=False,
+    connect_args={"charset": "utf8mb4"},
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

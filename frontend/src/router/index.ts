@@ -42,6 +42,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "竞赛日程" },
       },
       {
+        path: "records",
+        name: "records",
+        component: () => import("@/views/RecordView.vue"),
+        meta: { title: "最高记录" },
+      },
+      {
+        path: "scores",
+        name: "scores",
+        component: () => import("@/views/ScoresView.vue"),
+        meta: { title: "分数统计" },
+      },
+      {
+        path: "program",
+        name: "program",
+        component: () => import("@/views/ProgramView.vue"),
+        meta: { title: "秩序册" },
+      },
+      {
         path: "settings",
         name: "settings",
         component: () => import("@/views/SettingView.vue"),

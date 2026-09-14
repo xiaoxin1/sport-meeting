@@ -11,8 +11,8 @@ export const navItems: NavItem[] = [
   { index: "/events", title: "项目", icon: "Trophy" },
   { index: "/registration", title: "报名", icon: "User" },
   { index: "/schedule", title: "竞赛日程", icon: "Clock" },
-  { index: "/records", title: "最高记录", icon: "Medal", disabled: true },
-  { index: "/handbook", title: "秩序册生成", icon: "Document", disabled: true },
-  { index: "/scores", title: "分数统计", icon: "Histogram", disabled: true },
-  { index: "/settings", title: "系统设置", icon: "Setting" },
+  { index: "/records", title: "最高记录", icon: "Medal" },
+  { index: "/program", title: "秩序册", icon: "Document" },
+  { index: "/scores", title: "分数统计", icon: "Histogram" },
+  { index: "/settings", title: "系统设置", icon: "Tools" },
 ];

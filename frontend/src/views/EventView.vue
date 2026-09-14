@@ -20,6 +20,10 @@ const loading = ref(false);
 const keyword = ref("");
 const filterGroup = ref("");
 
+// 分页
+const currentPage = ref(1);
+const pageSize = ref(10);
+
 const dialogVisible = ref(false);
 const editingId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
@@ -45,6 +49,13 @@ const filtered = computed(() =>
     return okKw && okGroup;
   }),
 );
+
+// 分页后的数据
+const paginatedData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return filtered.value.slice(start, end);
+});
 
 const GENDER_ORDER = new Map(GENDERS.map((g, i) => [g, i]));
 
@@ -197,7 +208,7 @@ async function openRegistrations(row: Event) {
         <span class="count">共 {{ filtered.length }} 个项目</span>
       </div>
 
-      <el-table :data="filtered" v-loading="loading" stripe>
+      <el-table :data="paginatedData" v-loading="loading" stripe>
         <el-table-column
           label="项目名称"
           prop="name"
@@ -260,6 +271,15 @@ async function openRegistrations(row: Event) {
         </el-table-column>
         <template #empty>暂无项目，点击右上角「新建项目」添加。</template>
       </el-table>
+
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100, 1000]"
+        :total="filtered.length"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
     </div>
 
     <el-dialog
