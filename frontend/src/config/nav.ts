@@ -4,12 +4,13 @@ export interface NavItem {
   title: string;
   icon: string;
   disabled?: boolean;
+  leaderAllowed?: boolean; // 领队账号可见
 }
 
 export const navItems: NavItem[] = [
   { index: "/academic-years", title: "学年设置", icon: "Calendar" },
   { index: "/events", title: "项目", icon: "Trophy" },
-  { index: "/registration", title: "报名", icon: "User" },
+  { index: "/registration", title: "报名", icon: "User", leaderAllowed: true },
   { index: "/schedule", title: "竞赛日程", icon: "Clock" },
   { index: "/records", title: "最高记录", icon: "Medal" },
   { index: "/program", title: "秩序册", icon: "Document" },

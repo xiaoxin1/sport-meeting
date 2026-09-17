@@ -2,7 +2,11 @@
 import { computed, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
+  addGroup,
+  addLane,
   buildFinals,
+  deleteGroup,
+  deleteLane,
   getEntryDetail,
   updateLanes,
   updateResults,
@@ -39,6 +43,101 @@ const editForm = reactive({
 });
 
 const isPrelim = computed(() => detail.value?.round_type === "预赛");
+
+function toMin(t: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+function fromMin(v: number): string {
+  const h = Math.floor(v / 60);
+  const mm = v % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+// #4：按组数平分赛次总时间，得到每组的起始时间
+const groupStartTimes = computed<Record<number, string>>(() => {
+  const out: Record<number, string> = {};
+  const d = detail.value;
+  if (!d) return out;
+  const start = toMin(d.start_time);
+  const end = toMin(d.end_time);
+  const n = d.groups.length;
+  if (start === null || end === null || end <= start || n === 0) return out;
+  const slot = Math.floor((end - start) / n);
+  d.groups.forEach((g, i) => {
+    out[g.id] = fromMin(start + i * slot);
+  });
+  return out;
+});
+
+async function handleAddGroup() {
+  if (!detail.value) return;
+  saving.value = true;
+  try {
+    detail.value = await addGroup(detail.value.id);
+    ElMessage.success("已新增分组");
+    emit("refreshed");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "新增分组失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function handleDeleteGroup(groupId: number, groupNo: number) {
+  if (!detail.value) return;
+  await ElMessageBox.confirm(`确定删除第 ${groupNo} 组及其所有分道？`, "删除分组", {
+    type: "warning",
+    confirmButtonText: "删除",
+  });
+  saving.value = true;
+  try {
+    detail.value = await deleteGroup(detail.value.id, groupId);
+    ElMessage.success("已删除分组");
+    emit("refreshed");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "删除分组失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function handleAddLane(groupId: number) {
+  if (!detail.value) return;
+  saving.value = true;
+  try {
+    detail.value = await addLane(detail.value.id, {
+      group_id: groupId,
+      athlete_id: null,
+      class_team_id: null,
+    });
+    emit("refreshed");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "新增分道失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function handleDeleteLane(laneId: number) {
+  if (!detail.value) return;
+  await ElMessageBox.confirm("确定删除该分道？", "删除分道", {
+    type: "warning",
+    confirmButtonText: "删除",
+  });
+  saving.value = true;
+  try {
+    detail.value = await deleteLane(detail.value.id, laneId);
+    if (editingLaneId.value === laneId) editingLaneId.value = null;
+    ElMessage.success("已删除");
+    emit("refreshed");
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || "删除失败");
+  } finally {
+    saving.value = false;
+  }
+}
 const title = computed(() =>
   detail.value
     ? `${detail.value.event_name} · ${detail.value.group_name} · ${detail.value.gender} · ${detail.value.round_type}`
@@ -163,6 +262,7 @@ async function handleBuildFinals() {
             · {{ detail.start_time || '未设置' }}-{{ detail.end_time || '未设置' }} · {{ detail.venue }}
           </span>
           <div class="ops">
+            <el-button :loading="saving" @click="handleAddGroup">新增分组</el-button>
             <el-button
               v-if="isPrelim"
               type="warning"
@@ -175,11 +275,28 @@ async function handleBuildFinals() {
         </div>
 
         <div v-for="g in detail.groups" :key="g.id" class="group">
-          <h4>第 {{ g.group_no }} 组</h4>
+          <div class="group-head">
+            <h4>
+              第 {{ g.group_no }} 组
+              <span v-if="groupStartTimes[g.id]" class="gtime">{{ groupStartTimes[g.id] }}</span>
+            </h4>
+            <div class="group-ops">
+              <el-button size="small" :loading="saving" @click="handleAddLane(g.id)">新增分道</el-button>
+              <el-button
+                size="small"
+                type="danger"
+                plain
+                :loading="saving"
+                @click="handleDeleteGroup(g.id, g.group_no)"
+              >
+                删除分组
+              </el-button>
+            </div>
+          </div>
           <el-table :data="g.lanes" size="small" border stripe>
             <el-table-column label="分道" prop="lane_no" width="70" align="center" />
             <template v-if="!detail.is_team">
-              <el-table-column label="号码" min-width="120">
+              <el-table-column label="选手（号码/姓名/年级班级）" min-width="240">
                 <template #default="{ row }">
                   <template v-if="editingLaneId === row.id">
                     <el-select
@@ -198,14 +315,13 @@ async function handleBuildFinals() {
                       />
                     </el-select>
                   </template>
-                  <template v-else>{{ row.number }}</template>
+                  <template v-else>
+                    <span v-if="row.athlete_id">
+                      {{ row.number }} {{ row.athlete_name }} ({{ row.grade }}{{ row.class_name }})
+                    </span>
+                    <span v-else class="muted">—</span>
+                  </template>
                 </template>
-              </el-table-column>
-              <el-table-column label="姓名" min-width="120">
-                <template #default="{ row }">{{ row.athlete_name }}</template>
-              </el-table-column>
-              <el-table-column label="年级班级" min-width="120">
-                <template #default="{ row }">{{ row.grade }}{{ row.class_name }}</template>
               </el-table-column>
             </template>
             <template v-else>
@@ -275,6 +391,9 @@ async function handleBuildFinals() {
                   <el-button type="primary" size="small" link @click="startEdit(row)">
                     编辑
                   </el-button>
+                  <el-button type="danger" size="small" link @click="handleDeleteLane(row.id)">
+                    删除
+                  </el-button>
                 </template>
               </template>
             </el-table-column>
@@ -306,9 +425,27 @@ async function handleBuildFinals() {
 .group {
   margin-bottom: 18px;
 }
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.group-ops {
+  display: flex;
+  gap: 8px;
+}
 .group h4 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
+}
+.gtime {
+  margin-left: 8px;
+  font-weight: 500;
+  color: #409eff;
+}
+.muted {
+  color: #c0c4cc;
 }
 </style>

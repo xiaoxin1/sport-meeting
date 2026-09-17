@@ -13,6 +13,11 @@ const yearStore = useAcademicYearStore();
 
 const activeMenu = computed(() => route.path);
 
+// 领队仅显示允许的菜单（报名）
+const visibleNav = computed(() =>
+  auth.isLeader ? navItems.filter((i) => i.leaderAllowed) : navItems,
+);
+
 onMounted(() => {
   if (!yearStore.loaded) yearStore.refresh();
 });
@@ -36,7 +41,7 @@ async function handleLogout() {
       </div>
       <el-menu :default-active="activeMenu" router class="menu">
         <el-menu-item
-          v-for="item in navItems"
+          v-for="item in visibleNav"
           :key="item.index"
           :index="item.index"
           :disabled="item.disabled"

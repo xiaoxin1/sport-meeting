@@ -25,6 +25,21 @@ def get_base_url(db: Session) -> str:
     return _get_setting(db, "deepseek_base_url") or settings.deepseek_base_url
 
 
+def get_model(db: Session) -> str:
+    return _get_setting(db, "deepseek_model") or settings.deepseek_model
+
+
+def get_max_tokens(db: Session) -> int:
+    """输出上限。<=0 表示不限制（由模型自身上限决定）。"""
+    raw = _get_setting(db, "deepseek_max_tokens")
+    if raw is not None:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return settings.deepseek_max_tokens
+
+
 def chat_json(db: Session, system_prompt: str, user_prompt: str) -> dict:
     """调用 DeepSeek chat completions，要求返回 JSON。失败抛异常由上层处理。"""
     import logging
@@ -34,22 +49,28 @@ def chat_json(db: Session, system_prompt: str, user_prompt: str) -> dict:
     if not api_key:
         raise RuntimeError("未配置 DeepSeek API Key，请在系统设置中填写后再使用 AI 生成")
     base = get_base_url(db).rstrip("/")
+    model = get_model(db)
+    max_tokens = get_max_tokens(db)
+
+    payload: dict = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.3,
+    }
+    # 仅在显式配置正数上限时才传 max_tokens；否则由模型使用自身上限（V4 最高 384K）
+    if max_tokens and max_tokens > 0:
+        payload["max_tokens"] = max_tokens
 
     try:
         resp = httpx.post(
             f"{base}/chat/completions",
             headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.3,
-                "max_tokens": 8192,
-            },
-            timeout=180,
+            json=payload,
+            timeout=None,  # 生成/优化耗时较长，不设超时上限
         )
         resp.raise_for_status()
     except httpx.HTTPStatusError as e:
@@ -62,15 +83,24 @@ def chat_json(db: Session, system_prompt: str, user_prompt: str) -> dict:
     content = data["choices"][0]["message"]["content"]
     finish_reason = data["choices"][0].get("finish_reason")
 
-    logger.info(f"DeepSeek 响应长度: {len(content)} 字符, finish_reason: {finish_reason}")
+    logger.info(
+        f"DeepSeek[{model}] 响应长度: {len(content)} 字符, "
+        f"max_tokens={max_tokens or '不限'}, finish_reason: {finish_reason}"
+    )
 
     # 检查是否被截断
     if finish_reason == "length":
+        limit_hint = (
+            f"当前配置 max_tokens={max_tokens}。"
+            if max_tokens and max_tokens > 0
+            else f"当前模型「{model}」已达自身输出上限。"
+        )
         raise RuntimeError(
-            f"AI 返回内容超出长度限制（{len(content)} 字符）。"
-            "当前赛次数量较多，建议：\n"
-            "1. 减少优化需求的文字描述\n"
-            "2. 或联系管理员调整系统配置"
+            f"AI 返回内容因长度被截断（已输出 {len(content)} 字符）。{limit_hint}\n"
+            "建议：\n"
+            "1. 提高系统设置中的 deepseek_max_tokens（0=用模型自身上限）\n"
+            "2. 或改用输出上限更高的模型（如 DeepSeek V4，最高 384K）\n"
+            "3. 或减少一次生成的赛次规模 / 精简额外优化描述"
         )
 
     # 尝试解析JSON

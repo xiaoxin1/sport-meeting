@@ -30,7 +30,8 @@ class ClassTeam(Base):
     )
     grade: Mapped[str] = mapped_column(String(32), nullable=False)  # 年级
     class_name: Mapped[str] = mapped_column(String(32), nullable=False)  # 班级
-    leader_name: Mapped[str] = mapped_column(String(32), default="", nullable=False)  # 领队姓名
+    leader_name: Mapped[str] = mapped_column(String(32), default="", nullable=False)  # 领队姓名(兼登录用户名)
+    password: Mapped[str] = mapped_column(String(64), default="admin_sfls", nullable=False)  # 领队登录密码(明文)
     male_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 男生人数
     female_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 女生人数
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

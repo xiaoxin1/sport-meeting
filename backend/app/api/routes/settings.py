@@ -2,11 +2,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_admin
 from app.models.setting import AppSetting
 from app.schemas.setting import SettingOut, SettingUpdate
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(
+    prefix="/settings",
+    tags=["settings"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @router.get("", response_model=list[SettingOut])

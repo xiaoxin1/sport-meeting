@@ -2,6 +2,9 @@
 
 export const GENDERS = ["男", "女", "混合"] as const;
 
+/** 场地候选项。可在项目录入时自定义补充。 */
+export const VENUES = ["跑道", "跳高场", "跳远场", "操场"] as const;
+
 /** 组别(年级)候选项。小学一年级~高三，覆盖常见分组。 */
 export const GRADE_GROUPS = [
   "一年级",
@@ -17,3 +20,6 @@ export const GRADE_GROUPS = [
   "高二",
   "高三",
 ] as const;
+
+/** 班级候选项（1班~10班）。登录/报名下拉用，仍允许手动输入其他班级名。 */
+export const CLASS_OPTIONS = Array.from({ length: 10 }, (_, i) => `${i + 1}班`);

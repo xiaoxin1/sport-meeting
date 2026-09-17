@@ -9,9 +9,13 @@ from app.models.registration import ClassTeam, Athlete
 from app.models.event import Event
 from app.models.schedule import ScheduleEntry, ScheduleGroup, ScheduleLane
 from app.models.record import Record
-from app.api.deps import get_active_year
+from app.api.deps import get_active_year, require_admin
 
-router = APIRouter(prefix="/program", tags=["program"])
+router = APIRouter(
+    prefix="/program",
+    tags=["program"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 def _infer_unit(event_name: str) -> str:
@@ -77,12 +81,14 @@ def get_program_preview(
 
 def get_team_stats(db: Session, year_id: int):
     """1. 参赛队统计"""
+    from app.services.numbering import _grade_key, _class_key
+
     classes = (
         db.query(ClassTeam)
         .filter(ClassTeam.academic_year_id == year_id)
-        .order_by(ClassTeam.grade, ClassTeam.class_name)
         .all()
     )
+    classes.sort(key=lambda c: (_grade_key(c.grade), _class_key(c.class_name)))
 
     # 获取每个班级的号码范围
     teams = []
@@ -136,12 +142,14 @@ def get_team_stats(db: Session, year_id: int):
 
 def get_team_rosters(db: Session, year_id: int):
     """2. 代表队名单"""
+    from app.services.numbering import _grade_key, _class_key
+
     classes = (
         db.query(ClassTeam)
         .filter(ClassTeam.academic_year_id == year_id)
-        .order_by(ClassTeam.grade, ClassTeam.class_name)
         .all()
     )
+    classes.sort(key=lambda c: (_grade_key(c.grade), _class_key(c.class_name)))
 
     rosters = []
     for idx, cls in enumerate(classes, 1):
@@ -337,11 +345,18 @@ def get_records_matrix(db: Session):
 
         matrix[event_key][gender][grade] = {
             "holder_name": record.holder_name or "",
-            "result": record.result or "",
+            "result": record.historical_result or "",
         }
 
-    # 转换为列表格式
-    grades_list = sorted(list(grades))
+    # 年级列：固定包含 三年级 ~ 高三 的所有年级，从小到大排序；
+    # 记录中出现的其它未知年级按规范顺序追加到末尾。
+    from app.services.numbering import GRADE_ORDER, _grade_key
+
+    fixed_grades = GRADE_ORDER[GRADE_ORDER.index("三年级"):]
+    extra_grades = sorted(
+        (g for g in grades if g not in fixed_grades), key=_grade_key
+    )
+    grades_list = fixed_grades + extra_grades
     rows = []
 
     for event_name, genders in matrix.items():

@@ -2,16 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_active_year, get_current_user
+from app.api.deps import get_active_year, get_current_principal, require_admin
 from app.core.database import get_db
 from app.models.academic_year import AcademicYear
 from app.models.event import Event
 from app.schemas.event import EventCreate, EventOut, EventUpdate
 
+# 任意登录主体（管理员/领队）均可读取项目列表（领队报名需勾选项目）；写操作各自加 require_admin。
 router = APIRouter(
     prefix="/events",
     tags=["events"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_principal)],
 )
 
 
@@ -39,6 +40,7 @@ def list_events(
 @router.post("", response_model=EventOut, status_code=status.HTTP_201_CREATED)
 def create_event(
     payload: EventCreate,
+    _: object = Depends(require_admin),
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):
@@ -57,6 +59,7 @@ def create_event(
 def update_event(
     event_id: int,
     payload: EventUpdate,
+    _: object = Depends(require_admin),
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):
@@ -75,6 +78,7 @@ def update_event(
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_event(
     event_id: int,
+    _: object = Depends(require_admin),
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):

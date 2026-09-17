@@ -9,6 +9,7 @@ export interface ClassTeam {
   male_count: number;
   female_count: number;
   created_at: string;
+  password: string; // 仅管理员返回明文，领队为空串
 }
 
 export interface ClassTeamInput {
@@ -17,6 +18,7 @@ export interface ClassTeamInput {
   leader_name: string;
   male_count: number;
   female_count: number;
+  password?: string;
 }
 
 export interface Athlete {
@@ -123,6 +125,43 @@ export async function getEventRegistrations(
 ): Promise<EventRegistrationList> {
   const { data } = await client.get<EventRegistrationList>(
     `/registration/events/${eventId}/registrations`,
+  );
+  return data;
+}
+
+// ---------- 报名规则配置 + 整体保存 ----------
+export interface RegistrationConfig {
+  hint: string;
+  max_per_event: number;
+  max_events_per_person: number;
+}
+
+export async function getRegistrationConfig(): Promise<RegistrationConfig> {
+  const { data } = await client.get<RegistrationConfig>("/registration/config");
+  return data;
+}
+
+export interface RegistrationAthleteInput {
+  id: number | null;
+  name: string;
+  gender: "男" | "女";
+  event_ids: number[];
+}
+
+export interface RegistrationSaveRequest {
+  male_count: number;
+  female_count: number;
+  athletes: RegistrationAthleteInput[];
+  team_event_ids: number[];
+}
+
+export async function saveRegistration(
+  classId: number,
+  payload: RegistrationSaveRequest,
+): Promise<ClassTeamDetail> {
+  const { data } = await client.put<ClassTeamDetail>(
+    `/registration/classes/${classId}/registration`,
+    payload,
   );
   return data;
 }

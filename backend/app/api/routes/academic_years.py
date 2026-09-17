@@ -1,35 +1,40 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_principal, require_admin
 from app.core.database import get_db
 from app.models.academic_year import AcademicYear
-from app.models.user import User
 from app.schemas.academic_year import (
     AcademicYearCreate,
     AcademicYearOut,
     AcademicYearUpdate,
 )
 
+# 任意登录主体（管理员/领队）均可读取当前学年；写操作各自加 require_admin。
 router = APIRouter(
     prefix="/academic-years",
     tags=["academic-years"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_current_principal)],
 )
 
 
 @router.get("", response_model=list[AcademicYearOut])
-def list_years(db: Session = Depends(get_db)):
+def list_years(_: object = Depends(require_admin), db: Session = Depends(get_db)):
     return db.query(AcademicYear).order_by(AcademicYear.created_at.desc()).all()
 
 
 @router.get("/active", response_model=AcademicYearOut | None)
 def get_active(db: Session = Depends(get_db)):
+    """领队登录页/主布局需要读取当前学年，故对任意登录主体开放。"""
     return db.query(AcademicYear).filter(AcademicYear.is_active.is_(True)).first()
 
 
 @router.post("", response_model=AcademicYearOut, status_code=status.HTTP_201_CREATED)
-def create_year(payload: AcademicYearCreate, db: Session = Depends(get_db)):
+def create_year(
+    payload: AcademicYearCreate,
+    _: object = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     exists = db.query(AcademicYear).filter(AcademicYear.name == payload.name).first()
     if exists:
         raise HTTPException(status_code=400, detail="该学年已存在")
@@ -44,7 +49,12 @@ def create_year(payload: AcademicYearCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{year_id}", response_model=AcademicYearOut)
-def update_year(year_id: int, payload: AcademicYearUpdate, db: Session = Depends(get_db)):
+def update_year(
+    year_id: int,
+    payload: AcademicYearUpdate,
+    _: object = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     year = db.get(AcademicYear, year_id)
     if year is None:
         raise HTTPException(status_code=404, detail="学年不存在")
@@ -65,7 +75,11 @@ def update_year(year_id: int, payload: AcademicYearUpdate, db: Session = Depends
 
 
 @router.post("/{year_id}/activate", response_model=AcademicYearOut)
-def activate_year(year_id: int, db: Session = Depends(get_db)):
+def activate_year(
+    year_id: int,
+    _: object = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     year = db.get(AcademicYear, year_id)
     if year is None:
         raise HTTPException(status_code=404, detail="学年不存在")
@@ -77,7 +91,11 @@ def activate_year(year_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{year_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_year(year_id: int, db: Session = Depends(get_db)):
+def delete_year(
+    year_id: int,
+    _: object = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     year = db.get(AcademicYear, year_id)
     if year is None:
         raise HTTPException(status_code=404, detail="学年不存在")

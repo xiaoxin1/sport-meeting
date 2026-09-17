@@ -33,7 +33,7 @@ const routes: RouteRecordRaw[] = [
         path: "registration",
         name: "registration",
         component: () => import("@/views/RegistrationView.vue"),
-        meta: { title: "报名" },
+        meta: { title: "报名", leaderAllowed: true },
       },
       {
         path: "schedule",
@@ -81,7 +81,11 @@ router.beforeEach((to) => {
     return { name: "login", query: { redirect: to.fullPath } };
   }
   if (to.name === "login" && auth.isAuthenticated()) {
-    return { path: "/" };
+    return { path: auth.isLeader ? "/registration" : "/" };
+  }
+  // 领队仅能访问报名页
+  if (auth.isLeader && !to.meta.public && !to.meta.leaderAllowed) {
+    return { path: "/registration" };
   }
   return true;
 });

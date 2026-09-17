@@ -167,7 +167,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import axios from 'axios';
+import client from '@/api/client';
 import * as XLSX from 'xlsx';
 
 interface ProgramData {
@@ -246,7 +246,7 @@ async function loadPreview() {
 
   loading.value = true;
   try {
-    const response = await axios.get('/api/program/preview');
+    const response = await client.get('/program/preview');
     programData.value = response.data;
     ElMessage.success('秩序册预览加载成功');
   } catch (error: any) {
@@ -401,7 +401,7 @@ async function generateResults() {
 
   generatingResults.value = true;
   try {
-    const response = await axios.post('/api/program/generate-results');
+    const response = await client.post('/program/generate-results');
     ElMessage.success(`成绩生成成功！已生成 ${response.data.results_count} 条成绩记录`);
     // 重新加载预览
     await loadPreview();

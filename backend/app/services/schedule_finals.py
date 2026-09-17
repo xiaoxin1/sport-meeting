@@ -37,8 +37,10 @@ def build_finals(db: Session, prelim: ScheduleEntry) -> ScheduleEntry:
         .filter(ScheduleConfig.academic_year_id == prelim.academic_year_id)
         .first()
     )
-    lanes = cfg.lanes if cfg else 8
-    advance = prelim.advance_count or lanes
+    lanes = cfg.lanes if cfg else 6
+    # 每组容量：项目配置了 final_teams 则按项目，否则回退全局 lanes
+    gsize = ev.final_teams if ev and ev.final_teams > 0 else lanes
+    advance = prelim.advance_count or gsize
 
     # 收集预赛所有分道
     all_lanes: list[ScheduleLane] = []
@@ -59,12 +61,12 @@ def build_finals(db: Session, prelim: ScheduleEntry) -> ScheduleEntry:
     db.flush()
     final.groups.clear()
 
-    group_count = max(1, math.ceil(len(qualified) / lanes))
+    group_count = max(1, math.ceil(len(qualified) / gsize))
     final.group_count = group_count
     for g in range(group_count):
         grp = ScheduleGroup(group_no=g + 1)
         final.groups.append(grp)
-        chunk = qualified[g * lanes : (g + 1) * lanes]
+        chunk = qualified[g * gsize : (g + 1) * gsize]
         for i, src in enumerate(chunk):
             grp.lanes.append(
                 ScheduleLane(

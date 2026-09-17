@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ---------- 配置 ----------
 class ScheduleConfigBase(BaseModel):
     days: int = Field(2, ge=2, le=3)
-    lanes: int = Field(8, ge=2, le=12)
+    lanes: int = Field(6, ge=2, le=12)
     hard_rules: str = ""
     soft_rules: str = ""
 
@@ -16,14 +16,31 @@ class ScheduleConfigUpdate(ScheduleConfigBase):
 
 
 class EntryUpdate(BaseModel):
-    """赛次更新（手动编辑时间、场地等）"""
+    """赛次更新（只允许改开始/结束时间与场地，当天按时间排序）"""
 
+    start_time: str = Field(default="", max_length=5)
+    end_time: str = Field(default="", max_length=5)
+    venue: str = Field(default="", max_length=100)
+
+
+class EntryCreate(BaseModel):
+    """新增赛次（空赛次，分组分道后续在详情里手动新增）"""
+
+    event_id: int
     day_index: int = Field(ge=1, le=3)
     period: str = Field(pattern="^(上午|下午)$")
-    order_no: int = Field(ge=1)
-    start_time: str = Field(max_length=5)
-    end_time: str = Field(max_length=5)
-    venue: str = Field(max_length=100)
+    round_type: str = Field(default="决赛", pattern="^(预赛|决赛)$")
+    start_time: str = Field(default="", max_length=5)
+    end_time: str = Field(default="", max_length=5)
+    venue: str = Field(default="", max_length=100)
+
+
+class LaneCreate(BaseModel):
+    """在某组内新增一个分道/席位"""
+
+    group_id: int
+    athlete_id: int | None = None
+    class_team_id: int | None = None
 
 
 class ScheduleConfigOut(ScheduleConfigBase):
@@ -106,4 +123,16 @@ class ResultsUpdate(BaseModel):
 
 
 class AIOptimizeIn(BaseModel):
-    message: str = Field(..., min_length=1)
+    # 对话框额外要求；可为空。为空时仅按规则+数据生成/优化
+    message: str = Field(default="")
+
+
+class ClearScheduleIn(BaseModel):
+    admin_password: str = Field(..., min_length=1)
+
+
+class AIOptimizeOut(BaseModel):
+    """AI 生成/优化后返回的缺陷/优化报告"""
+
+    issues: list[str] = Field(default_factory=list)
+    mode: str = "optimize"  # "generate" 或 "optimize"

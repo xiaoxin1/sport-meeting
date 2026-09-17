@@ -36,6 +36,7 @@ class Event(Base):
     name: Mapped[str] = mapped_column(String(64), nullable=False)  # 项目名称
     group_name: Mapped[str] = mapped_column(String(32), nullable=False)  # 组别(年级)
     gender: Mapped[str] = mapped_column(String(8), nullable=False)  # 男 / 女 / 混合
+    venue: Mapped[str] = mapped_column(String(32), nullable=False)  # 场地(必填,日程场地来源于此)
 
     # 决赛队伍数：报名人数(队伍数)低于该值则直接决赛，否则需增加预赛
     final_teams: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

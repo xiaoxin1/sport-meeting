@@ -16,10 +16,14 @@ from app.models.schedule import (
 )
 from app.schemas.schedule import (
     AIOptimizeIn,
+    AIOptimizeOut,
+    ClearScheduleIn,
+    EntryCreate,
     EntryDetail,
     EntryOut,
     EntryUpdate,
     GroupOut,
+    LaneCreate,
     LaneOut,
     LaneUpdateIn,
     ResultsUpdate,
@@ -27,10 +31,12 @@ from app.schemas.schedule import (
     ScheduleConfigUpdate,
     ScheduleOut,
 )
-from app.services.schedule_ai import optimize_schedule
+from app.core.security import verify_password
+from app.models.user import User
+from app.services.schedule_ai import optimize_schedule, check_schedule
+from app.services.schedule_gen import generate_schedule
 from app.services.record_update import update_record_if_broken
 from app.services.schedule_finals import build_finals
-from app.services.schedule_gen import generate_schedule
 from app.services.schedule_rules import DEFAULT_HARD_RULES, DEFAULT_SOFT_RULES
 
 router = APIRouter(
@@ -50,7 +56,7 @@ def _get_or_create_config(year: AcademicYear, db: Session) -> ScheduleConfig:
         cfg = ScheduleConfig(
             academic_year_id=year.id,
             days=2,
-            lanes=8,
+            lanes=6,
             hard_rules=DEFAULT_HARD_RULES,
             soft_rules=DEFAULT_SOFT_RULES,
             ai_history="[]",
@@ -88,58 +94,122 @@ def update_config(
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):
+    """更新配置（仅跑道数）"""
+    if payload.lanes < 2 or payload.lanes > 12:
+        raise HTTPException(status_code=400, detail="跑道数必须在 2-12 之间")
     cfg = _get_or_create_config(year, db)
-    cfg.days = payload.days
     cfg.lanes = payload.lanes
-    cfg.hard_rules = payload.hard_rules
-    cfg.soft_rules = payload.soft_rules
     db.commit()
     db.refresh(cfg)
     return _config_out(cfg)
 
 
-# ---------- 生成 / AI优化 ----------
-@router.post("/generate", response_model=ScheduleConfigOut)
-def regenerate(
-    year: AcademicYear = Depends(get_active_year), db: Session = Depends(get_db)
+# ---------- 清除日程 / AI 生成·优化 ----------
+@router.post("/clear", response_model=ScheduleConfigOut)
+def clear_schedule(
+    payload: ClearScheduleIn,
+    year: AcademicYear = Depends(get_active_year),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    """清除当前学年全部日程，需管理员密码确认。"""
+    if not verify_password(payload.admin_password, current.password_hash):
+        raise HTTPException(status_code=403, detail="管理员密码错误")
+    cfg = _get_or_create_config(year, db)
+    db.query(ScheduleEntry).filter(
+        ScheduleEntry.academic_year_id == year.id
+    ).delete(synchronize_session=False)
+    cfg.ai_history = "[]"
+    cfg.generated_at = None
+    db.commit()
+    db.refresh(cfg)
+    return _config_out(cfg)
+
+
+@router.post("/generate", response_model=ScheduleOut)
+def generate_by_rules(
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """规则生成日程：清空旧日程，按规则确定性重建。"""
     from datetime import datetime
 
     cfg = _get_or_create_config(year, db)
-    cfg.ai_history = "[]"  # 重新生成清空 AI 追加消息
-    generate_schedule(db, year.id, cfg)
-    cfg.generated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(cfg)
-    return _config_out(cfg)
+    try:
+        generate_schedule(db, year.id, cfg)
+        cfg.generated_at = datetime.utcnow()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"规则生成失败：{e}")
+
+    return get_schedule(year, db)
 
 
-@router.post("/ai-optimize", response_model=ScheduleConfigOut)
+@router.post("/ai-optimize", response_model=AIOptimizeOut)
 def ai_optimize(
     payload: AIOptimizeIn,
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):
+    """AI 优化已有日程。需要先有日程才能使用。"""
+    from datetime import datetime
+
     cfg = _get_or_create_config(year, db)
     has_entries = (
         db.query(ScheduleEntry)
         .filter(ScheduleEntry.academic_year_id == year.id)
         .count()
     )
+
     if not has_entries:
-        raise HTTPException(status_code=400, detail="请先「重新生成」日程，再进行 AI 优化")
-    history = json.loads(cfg.ai_history or "[]")
-    history.append(payload.message.strip())
-    cfg.ai_history = json.dumps(history, ensure_ascii=False)
-    db.flush()
+        raise HTTPException(status_code=400, detail="请先使用规则生成日程，再进行 AI 优化")
+
+    extra = (payload.message or "").strip()
+    if extra:
+        history = json.loads(cfg.ai_history or "[]")
+        history.append(extra)
+        cfg.ai_history = json.dumps(history, ensure_ascii=False)
+        db.flush()
+
     try:
-        optimize_schedule(db, year.id, cfg)
-    except Exception as e:  # noqa: BLE001
+        issues = optimize_schedule(db, year.id, cfg, extra=extra)
+    except Exception as e:
         db.rollback()
         raise HTTPException(status_code=502, detail=f"AI 优化失败：{e}")
+
+    cfg.generated_at = datetime.utcnow()
     db.commit()
-    db.refresh(cfg)
-    return _config_out(cfg)
+    return AIOptimizeOut(issues=issues, mode="optimize")
+
+
+@router.post("/ai-check", response_model=AIOptimizeOut)
+def ai_check(
+    payload: AIOptimizeIn,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """AI 检查已有日程，返回优化建议，但不修改日程。"""
+    cfg = _get_or_create_config(year, db)
+    has_entries = (
+        db.query(ScheduleEntry)
+        .filter(ScheduleEntry.academic_year_id == year.id)
+        .count()
+    )
+
+    if not has_entries:
+        raise HTTPException(status_code=400, detail="请先使用规则生成日程，再进行 AI 检查")
+
+    extra = (payload.message or "").strip()
+
+    try:
+        suggestions = check_schedule(db, year.id, cfg, extra=extra)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=f"AI 检查失败：{e}")
+
+    db.commit()
+    return AIOptimizeOut(issues=suggestions, mode="check")
 
 
 # ---------- 读取整表 ----------
@@ -151,7 +221,12 @@ def get_schedule(
     entries = (
         db.query(ScheduleEntry)
         .filter(ScheduleEntry.academic_year_id == year.id)
-        .order_by(ScheduleEntry.day_index, ScheduleEntry.order_no)
+        .order_by(
+            ScheduleEntry.day_index,
+            ScheduleEntry.period,
+            ScheduleEntry.start_time,
+            ScheduleEntry.order_no,
+        )
         .all()
     )
     ev_cache: dict[int, Event] = {}
@@ -208,13 +283,10 @@ def update_entry(
     year: AcademicYear = Depends(get_active_year),
     db: Session = Depends(get_db),
 ):
-    """手动编辑赛次时间、场地等"""
+    """手动编辑赛次：只允许改开始/结束时间与场地，当天始终按时间排序"""
     e = db.get(ScheduleEntry, entry_id)
     if e is None or e.academic_year_id != year.id:
         raise HTTPException(status_code=404, detail="赛次不存在")
-    e.day_index = payload.day_index
-    e.period = payload.period
-    e.order_no = payload.order_no
     e.start_time = payload.start_time
     e.end_time = payload.end_time
     e.venue = payload.venue
@@ -222,6 +294,55 @@ def update_entry(
     db.refresh(e)
     ev = db.get(Event, e.event_id)
     return _entry_out(e, ev)
+
+
+@router.post("/entries", response_model=EntryOut, status_code=status.HTTP_201_CREATED)
+def create_entry(
+    payload: EntryCreate,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """新增一个空赛次（分组分道稍后在详情里手动添加）"""
+    ev = db.get(Event, payload.event_id)
+    if ev is None or ev.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    # order_no 追加到末尾
+    max_order = (
+        db.query(ScheduleEntry.order_no)
+        .filter(ScheduleEntry.academic_year_id == year.id)
+        .order_by(ScheduleEntry.order_no.desc())
+        .first()
+    )
+    e = ScheduleEntry(
+        academic_year_id=year.id,
+        event_id=payload.event_id,
+        day_index=payload.day_index,
+        period=payload.period,
+        round_type=payload.round_type,
+        order_no=(max_order[0] if max_order else 0) + 1,
+        group_count=0,
+        advance_count=0,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        venue=payload.venue,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    return _entry_out(e, ev)
+
+
+@router.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_entry(
+    entry_id: int,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    db.delete(e)
+    db.commit()
 
 
 @router.get("/entries/{entry_id}", response_model=EntryDetail)
@@ -285,6 +406,96 @@ def update_lanes(
         ln = db.get(ScheduleLane, item.lane_id)
         ln.athlete_id = item.athlete_id
         ln.class_team_id = item.class_team_id
+    db.commit()
+    return get_entry_detail(entry_id, year, db)
+
+
+@router.post("/entries/{entry_id}/groups", response_model=EntryDetail)
+def add_group(
+    entry_id: int,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """在赛次末尾新增一个空的小组"""
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    max_no = max([g.group_no for g in e.groups], default=0)
+    grp = ScheduleGroup(entry_id=e.id, group_no=max_no + 1)
+    db.add(grp)
+    e.group_count = len(e.groups) + 1
+    db.commit()
+    return get_entry_detail(entry_id, year, db)
+
+
+@router.delete("/entries/{entry_id}/groups/{group_id}", response_model=EntryDetail)
+def delete_group(
+    entry_id: int,
+    group_id: int,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """删除赛次下的一个小组（含其分道），并重排剩余小组编号"""
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    grp = db.get(ScheduleGroup, group_id)
+    if grp is None or grp.entry_id != e.id:
+        raise HTTPException(status_code=404, detail="小组不存在")
+    db.delete(grp)
+    db.flush()
+    # 重排剩余小组编号，保持连续
+    remaining = sorted(
+        [g for g in e.groups if g.id != group_id], key=lambda g: g.group_no
+    )
+    for i, g in enumerate(remaining, start=1):
+        g.group_no = i
+    e.group_count = len(remaining)
+    db.commit()
+    return get_entry_detail(entry_id, year, db)
+
+
+@router.post("/entries/{entry_id}/lanes/add", response_model=EntryDetail)
+def add_lane(
+    entry_id: int,
+    payload: LaneCreate,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    """在指定小组内新增一个分道/席位"""
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    grp = db.get(ScheduleGroup, payload.group_id)
+    if grp is None or grp.entry_id != e.id:
+        raise HTTPException(status_code=404, detail="小组不存在")
+    max_lane = max([ln.lane_no for ln in grp.lanes], default=0)
+    ln = ScheduleLane(
+        group_id=grp.id,
+        lane_no=max_lane + 1,
+        athlete_id=payload.athlete_id,
+        class_team_id=payload.class_team_id,
+    )
+    db.add(ln)
+    db.commit()
+    return get_entry_detail(entry_id, year, db)
+
+
+@router.delete("/entries/{entry_id}/lanes/{lane_id}", response_model=EntryDetail)
+def delete_lane(
+    entry_id: int,
+    lane_id: int,
+    year: AcademicYear = Depends(get_active_year),
+    db: Session = Depends(get_db),
+):
+    e = db.get(ScheduleEntry, entry_id)
+    if e is None or e.academic_year_id != year.id:
+        raise HTTPException(status_code=404, detail="赛次不存在")
+    valid_lane_ids = {ln.id for grp in e.groups for ln in grp.lanes}
+    if lane_id not in valid_lane_ids:
+        raise HTTPException(status_code=404, detail="分道不存在")
+    ln = db.get(ScheduleLane, lane_id)
+    db.delete(ln)
     db.commit()
     return get_entry_detail(entry_id, year, db)
 

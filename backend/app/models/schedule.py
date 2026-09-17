@@ -27,7 +27,7 @@ class ScheduleConfig(Base):
         ForeignKey("academic_years.id", ondelete="CASCADE"), index=True, nullable=False
     )
     days: Mapped[int] = mapped_column(Integer, default=2, nullable=False)  # 2 或 3 天
-    lanes: Mapped[int] = mapped_column(Integer, default=8, nullable=False)  # 径赛分道数
+    lanes: Mapped[int] = mapped_column(Integer, default=6, nullable=False)  # 径赛分道数
     hard_rules: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 强规则
     soft_rules: Mapped[str] = mapped_column(Text, default="", nullable=False)  # 优化规则 a-i
     ai_history: Mapped[str] = mapped_column(Text, default="[]", nullable=False)  # AI追加消息(JSON数组)

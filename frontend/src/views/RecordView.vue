@@ -22,7 +22,7 @@
         <span class="count">共 {{ filteredRecords.length }} 条记录</span>
       </div>
 
-      <el-table :data="paginatedRecords" border stripe row-key="id">
+      <el-table :data="filteredRecords" border stripe row-key="id">
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column prop="event_name" label="项目名称" width="120" />
         <el-table-column prop="group_name" label="年级" width="100" />
@@ -54,15 +54,6 @@
           </template>
         </el-table-column>
       </el-table>
-
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100, 1000]"
-        :total="filteredRecords.length"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 16px; justify-content: flex-end"
-      />
     </el-card>
 
     <!-- 新增项目对话框 -->
@@ -159,15 +150,6 @@ const filteredRecords = computed(() =>
     return okKw && okGroup;
   }),
 );
-
-// 分页
-const currentPage = ref(1);
-const pageSize = ref(10);
-const paginatedRecords = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return filteredRecords.value.slice(start, end);
-});
 
 const createForm = ref<RecordCreate>({
   event_name: "",

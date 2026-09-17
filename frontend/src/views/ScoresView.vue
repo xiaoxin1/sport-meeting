@@ -30,7 +30,7 @@
             </el-select>
           </div>
 
-          <el-table :data="paginatedClassScores" border style="width: 100%; margin-top: 16px">
+          <el-table :data="classScores" border style="width: 100%; margin-top: 16px">
             <el-table-column prop="rank_in_grade" label="排名" width="80" />
             <el-table-column prop="grade" label="年级" width="120" />
             <el-table-column prop="class_name" label="班级" width="120" />
@@ -47,15 +47,6 @@
               </template>
             </el-table-column>
           </el-table>
-
-          <el-pagination
-            v-model:current-page="classCurrentPage"
-            v-model:page-size="classPageSize"
-            :page-sizes="[10, 20, 50, 100, 1000]"
-            :total="classScores.length"
-            layout="total, sizes, prev, pager, next, jumper"
-            style="margin-top: 16px; justify-content: flex-end"
-          />
         </el-tab-pane>
 
         <!-- 个人统计 -->
@@ -77,7 +68,7 @@
             </el-select>
           </div>
 
-          <el-table :data="paginatedAthleteScores" border style="width: 100%; margin-top: 16px">
+          <el-table :data="athleteScores" border style="width: 100%; margin-top: 16px">
             <el-table-column prop="rank_in_grade" label="排名" width="80" />
             <el-table-column prop="grade" label="年级" width="120" />
             <el-table-column prop="athlete_name" label="姓名" width="120" />
@@ -95,15 +86,6 @@
               </template>
             </el-table-column>
           </el-table>
-
-          <el-pagination
-            v-model:current-page="athleteCurrentPage"
-            v-model:page-size="athletePageSize"
-            :page-sizes="[10, 20, 50, 100, 1000]"
-            :total="athleteScores.length"
-            layout="total, sizes, prev, pager, next, jumper"
-            style="margin-top: 16px; justify-content: flex-end"
-          />
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -177,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   calculateScores,
@@ -207,30 +189,12 @@ const classDetailVisible = ref(false);
 const currentClass = ref<ClassScore>();
 const classDetails = ref<ScoreDetail[]>([]);
 
-// 班级分页
-const classCurrentPage = ref(1);
-const classPageSize = ref(10);
-const paginatedClassScores = computed(() => {
-  const start = (classCurrentPage.value - 1) * classPageSize.value;
-  const end = start + classPageSize.value;
-  return classScores.value.slice(start, end);
-});
-
 // 个人统计
 const athleteScores = ref<AthleteScore[]>([]);
 const athleteGradeFilter = ref<string>();
 const athleteDetailVisible = ref(false);
 const currentAthlete = ref<AthleteScore>();
 const athleteDetails = ref<ScoreDetail[]>([]);
-
-// 个人分页
-const athleteCurrentPage = ref(1);
-const athletePageSize = ref(10);
-const paginatedAthleteScores = computed(() => {
-  const start = (athleteCurrentPage.value - 1) * athletePageSize.value;
-  const end = start + athletePageSize.value;
-  return athleteScores.value.slice(start, end);
-});
 
 onMounted(async () => {
   await fetchClassScores();

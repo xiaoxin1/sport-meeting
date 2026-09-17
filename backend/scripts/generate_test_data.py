@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import random
 from sqlalchemy import text
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.academic_year import AcademicYear
 from app.models.event import Event
@@ -134,6 +135,48 @@ for grade in ["二年级", "三年级", "四年级", "五年级", "六年级"]:
 for grade in ["初一", "初二", "初三", "高一", "高二", "高三"]:
     CLASSES[grade] = [f"{i}班" for i in range(1, 9)]
 
+# 每组决赛队伍/人数（每组容量）。键匹配项目名称，未列出的项目按全局 lanes 分组。
+EVENT_GROUP_SIZE = {
+    "60M": 6,
+    "100M": 6,
+    "100M*2": 6,
+    "100M*4": 6,
+    "800M": 50,
+    "1000M": 50,
+    "播种与收割": 50,
+    "十人抓杆": 50,
+    "掷垒球": 50,   # 垒球
+    "实心球": 50,   # 侧向推实心球
+    "跳高": 50,
+    "跳远": 50,
+    "袋鼠跳": 50,
+    "师生同乐": 50,
+}
+
+
+def infer_group_size(config: dict) -> int:
+    """按项目名称返回每组容量；未配置返回 0（生成日程时回退到全局 lanes）。"""
+    return EVENT_GROUP_SIZE.get(config["name"], 0)
+
+
+def infer_venue(config: dict) -> str:
+    """按项目类型推断场地：跑道 / 跳高场 / 跳远场 / 操场（对应前端 VENUES）。
+
+    规则：所有径赛(含 M 距离项目、接力)→ 跑道；跳高 → 跳高场；
+    跳远 → 跳远场；其余(投掷、趣味团队等)→ 操场。
+    """
+    name = config["name"]
+    if "跳高" in name:
+        return "跳高场"
+    if "跳远" in name:
+        return "跳远场"
+    # 径赛：含 M(米)距离项目，以及各类跑步接力
+    if "M" in name.upper() or "接力" in name:
+        return "跑道"
+    # 其余：投掷、趣味团队项目等
+    return "操场"
+
+
 def generate_historical_result(event_name: str, gender: str, unit: str) -> str:
     """生成历史记录成绩"""
     if unit == "秒":
@@ -212,7 +255,9 @@ def create_events(db, year_id: int):
                 name=config["name"],
                 group_name=grade,
                 gender=config["gender"],
-                is_team=config["is_team"]
+                venue=infer_venue(config),
+                is_team=config["is_team"],
+                final_teams=infer_group_size(config)
             )
             db.add(event)
             events.append((grade, config))
@@ -242,6 +287,7 @@ def create_registrations(db, year_id: int):
                 grade=grade,
                 class_name=class_name,
                 leader_name=generate_name(random.choice(["男", "女"])),
+                password=settings.leader_default_password,
                 male_count=0,
                 female_count=0
             )
@@ -260,51 +306,45 @@ def create_registrations(db, year_id: int):
             individual_events_female = [e for e in grade_events if not e.is_team and e.gender == "女"]
             team_events = [e for e in grade_events if e.is_team]
 
-            for i in range(male_count):
-                student_name = generate_name("男")
+            # 每班同一项目最多 2 人报名：按 event.id 统计已报人数
+            MAX_PER_EVENT = 2
+            event_reg_count = {}
+
+            def register_athlete(gender: str, candidate_events):
+                """为一名运动员选 1~2 个项目，遵守每班每项目≤2人的限制。"""
+                nonlocal athlete_count, registration_count
+                student_name = generate_name(gender)
                 athlete = Athlete(
                     class_team_id=class_team.id,
                     name=student_name,
-                    gender="男",
+                    gender=gender,
                     number=None
                 )
                 db.add(athlete)
                 db.flush()
                 athlete_count += 1
 
-                num_events = random.randint(2, 3)
-                selected_events = random.sample(individual_events_male, min(num_events, len(individual_events_male)))
-
+                # 只在未报满的项目里选
+                available = [e for e in candidate_events
+                             if event_reg_count.get(e.id, 0) < MAX_PER_EVENT]
+                if not available:
+                    return
+                num_events = random.randint(1, 2)
+                selected_events = random.sample(available, min(num_events, len(available)))
                 for event in selected_events:
                     athlete_event = AthleteEvent(
                         athlete_id=athlete.id,
                         event_id=event.id
                     )
                     db.add(athlete_event)
+                    event_reg_count[event.id] = event_reg_count.get(event.id, 0) + 1
                     registration_count += 1
+
+            for i in range(male_count):
+                register_athlete("男", individual_events_male)
 
             for i in range(female_count):
-                student_name = generate_name("女")
-                athlete = Athlete(
-                    class_team_id=class_team.id,
-                    name=student_name,
-                    gender="女",
-                    number=None
-                )
-                db.add(athlete)
-                db.flush()
-                athlete_count += 1
-
-                num_events = random.randint(2, 3)
-                selected_events = random.sample(individual_events_female, min(num_events, len(individual_events_female)))
-
-                for event in selected_events:
-                    athlete_event = AthleteEvent(
-                        athlete_id=athlete.id,
-                        event_id=event.id
-                    )
-                    db.add(athlete_event)
-                    registration_count += 1
+                register_athlete("女", individual_events_female)
 
             if team_events:
                 num_team_events = random.randint(2, min(3, len(team_events)))

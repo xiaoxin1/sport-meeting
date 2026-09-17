@@ -14,9 +14,12 @@ import { listEvents, type Event } from "@/api/events";
 import { GRADE_GROUPS } from "@/config/constants";
 import { compareGrade, naturalCompare } from "@/config/sort";
 import { useAcademicYearStore } from "@/stores/academicYear";
+import { useAuthStore } from "@/stores/auth";
 import RegistrationDetail from "./registration/RegistrationDetail.vue";
 
 const yearStore = useAcademicYearStore();
+const auth = useAuthStore();
+const isAdmin = computed(() => auth.isAdmin);
 const classes = ref<ClassTeam[]>([]);
 const events = ref<Event[]>([]);
 const loading = ref(false);
@@ -34,17 +37,6 @@ const filteredClasses = computed(() =>
   }),
 );
 
-// 分页
-const currentPage = ref(1);
-const pageSize = ref(10);
-
-// 分页后的数据
-const paginatedClasses = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return filteredClasses.value.slice(start, end);
-});
-
 const dialogVisible = ref(false);
 const editingId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
@@ -54,10 +46,12 @@ const form = reactive<ClassTeamInput>({
   leader_name: "",
   male_count: 0,
   female_count: 0,
+  password: "",
 });
 const rules: FormRules = {
   grade: [{ required: true, message: "请选择年级", trigger: "change" }],
   class_name: [{ required: true, message: "请输入班级", trigger: "blur" }],
+  leader_name: [{ required: true, message: "请输入领队姓名", trigger: "blur" }],
 };
 
 // 详情抽屉
@@ -94,6 +88,7 @@ function openCreate() {
     leader_name: "",
     male_count: 0,
     female_count: 0,
+    password: "",
   });
   dialogVisible.value = true;
 }
@@ -106,6 +101,7 @@ function openEdit(row: ClassTeam) {
     leader_name: row.leader_name,
     male_count: row.male_count,
     female_count: row.female_count,
+    password: row.password || "",
   });
   dialogVisible.value = true;
 }
@@ -171,7 +167,7 @@ async function handleGenerate() {
         <h2 class="sfls-page-title">报名</h2>
         <p class="sfls-page-subtitle">以班级为单位报名。男/女生人数各不超过 10 人。</p>
       </div>
-      <div class="actions">
+      <div class="actions" v-if="isAdmin">
         <el-button
           :icon="'Postcard'"
           :loading="generating"
@@ -209,7 +205,7 @@ async function handleGenerate() {
         <span class="count">共 {{ filteredClasses.length }} 个班级</span>
       </div>
 
-      <el-table :data="paginatedClasses" v-loading="loading" stripe>
+      <el-table :data="filteredClasses" v-loading="loading" stripe>
         <el-table-column
           label="年级"
           prop="grade"
@@ -229,26 +225,22 @@ async function handleGenerate() {
             <span :class="{ muted: !row.leader_name }">{{ row.leader_name || "—" }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="男生人数" prop="male_count" min-width="140" sortable />
-        <el-table-column label="女生人数" prop="female_count" min-width="140" sortable />
+        <el-table-column label="男生人数" prop="male_count" min-width="120" sortable />
+        <el-table-column label="女生人数" prop="female_count" min-width="120" sortable />
+        <el-table-column v-if="isAdmin" label="密码" prop="password" min-width="140">
+          <template #default="{ row }">
+            <span :class="{ muted: !row.password }">{{ row.password || "—" }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" min-width="200">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="isAdmin" link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>暂无班级，点击右上角「手动添加」开始。</template>
       </el-table>
-
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100, 1000]"
-        :total="filteredClasses.length"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 16px; justify-content: flex-end"
-      />
     </div>
 
     <!-- 班级新增/编辑 -->
@@ -266,17 +258,21 @@ async function handleGenerate() {
               filterable
               allow-create
               default-first-option
+              :disabled="!isAdmin"
               style="width: 100%"
             >
               <el-option v-for="g in GRADE_GROUPS" :key="g" :label="g" :value="g" />
             </el-select>
           </el-form-item>
           <el-form-item label="班级" prop="class_name" class="flex1">
-            <el-input v-model="form.class_name" placeholder="如 1班" />
+            <el-input v-model="form.class_name" placeholder="如 1班" :disabled="!isAdmin" />
           </el-form-item>
         </div>
-        <el-form-item label="领队姓名">
-          <el-input v-model="form.leader_name" placeholder="领队姓名" />
+        <el-form-item label="领队姓名" prop="leader_name">
+          <el-input v-model="form.leader_name" placeholder="领队姓名" :disabled="!isAdmin" />
+        </el-form-item>
+        <el-form-item v-if="isAdmin" label="登录密码">
+          <el-input v-model="form.password" placeholder="留空则默认 admin_sfls" clearable />
         </el-form-item>
         <div class="form-row">
           <el-form-item label="男生人数" class="flex1">
@@ -309,6 +305,7 @@ async function handleGenerate() {
       v-model="detailVisible"
       :class-id="detailClassId"
       :events="events"
+      @saved="load"
     />
   </div>
 </template>

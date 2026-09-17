@@ -10,7 +10,7 @@ import {
   type EventInput,
 } from "@/api/events";
 import { getEventRegistrations, type EventRegistrationList } from "@/api/registration";
-import { GENDERS, GRADE_GROUPS } from "@/config/constants";
+import { GENDERS, GRADE_GROUPS, VENUES } from "@/config/constants";
 import { compareGrade, naturalCompare } from "@/config/sort";
 import { useAcademicYearStore } from "@/stores/academicYear";
 
@@ -20,10 +20,6 @@ const loading = ref(false);
 const keyword = ref("");
 const filterGroup = ref("");
 
-// 分页
-const currentPage = ref(1);
-const pageSize = ref(10);
-
 const dialogVisible = ref(false);
 const editingId = ref<number | null>(null);
 const formRef = ref<FormInstance>();
@@ -31,6 +27,7 @@ const form = reactive<EventInput>({
   name: "",
   group_name: "",
   gender: "男",
+  venue: "",
   final_teams: 0,
   is_team: false,
   description: "",
@@ -40,6 +37,7 @@ const rules: FormRules = {
   name: [{ required: true, message: "请输入项目名称", trigger: "blur" }],
   group_name: [{ required: true, message: "请选择组别", trigger: "change" }],
   gender: [{ required: true, message: "请选择性别", trigger: "change" }],
+  venue: [{ required: true, message: "请选择或输入场地", trigger: "change" }],
 };
 
 const filtered = computed(() =>
@@ -49,13 +47,6 @@ const filtered = computed(() =>
     return okKw && okGroup;
   }),
 );
-
-// 分页后的数据
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return filtered.value.slice(start, end);
-});
 
 const GENDER_ORDER = new Map(GENDERS.map((g, i) => [g, i]));
 
@@ -90,6 +81,7 @@ function openCreate() {
     name: "",
     group_name: "",
     gender: "男",
+    venue: "",
     final_teams: 0,
     is_team: false,
     description: "",
@@ -103,6 +95,7 @@ function openEdit(row: Event) {
     name: row.name,
     group_name: row.group_name,
     gender: row.gender,
+    venue: row.venue,
     final_teams: row.final_teams,
     is_team: row.is_team,
     description: row.description,
@@ -208,7 +201,7 @@ async function openRegistrations(row: Event) {
         <span class="count">共 {{ filtered.length }} 个项目</span>
       </div>
 
-      <el-table :data="paginatedData" v-loading="loading" stripe>
+      <el-table :data="filtered" v-loading="loading" stripe>
         <el-table-column
           label="项目名称"
           prop="name"
@@ -236,6 +229,13 @@ async function openRegistrations(row: Event) {
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column
+          label="场地"
+          prop="venue"
+          min-width="140"
+          sortable
+          :sort-method="(a: Event, b: Event) => a.venue.localeCompare(b.venue, 'zh')"
+        />
         <el-table-column
           label="类型"
           prop="is_team"
@@ -271,15 +271,6 @@ async function openRegistrations(row: Event) {
         </el-table-column>
         <template #empty>暂无项目，点击右上角「新建项目」添加。</template>
       </el-table>
-
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100, 1000]"
-        :total="filtered.length"
-        layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 16px; justify-content: flex-end"
-      />
     </div>
 
     <el-dialog
@@ -307,6 +298,20 @@ async function openRegistrations(row: Event) {
           <el-form-item label="性别" prop="gender" class="flex1">
             <el-select v-model="form.gender" style="width: 100%">
               <el-option v-for="g in GENDERS" :key="g" :label="g" :value="g" />
+            </el-select>
+          </el-form-item>
+        </div>
+        <div class="form-row">
+          <el-form-item label="场地" prop="venue" class="flex1">
+            <el-select
+              v-model="form.venue"
+              placeholder="选择或输入场地"
+              filterable
+              allow-create
+              default-first-option
+              style="width: 100%"
+            >
+              <el-option v-for="v in VENUES" :key="v" :label="v" :value="v" />
             </el-select>
           </el-form-item>
         </div>

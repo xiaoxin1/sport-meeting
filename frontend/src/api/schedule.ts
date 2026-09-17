@@ -8,23 +8,38 @@ export interface ScheduleConfig {
   hard_rules: string;
   soft_rules: string;
   ai_history: string[];
+  last_ai_request: string;
+  last_ai_response: string;
+  last_ai_report: string[];
+  last_ai_mode: string;
+  last_ai_time: string | null;
   generated_at: string | null;
 }
 
 export interface ScheduleConfigInput {
-  days: number;
   lanes: number;
-  hard_rules: string;
-  soft_rules: string;
 }
 
 export interface EntryUpdateInput {
-  day_index: number;
-  period: string;
-  order_no: number;
   start_time: string;
   end_time: string;
   venue: string;
+}
+
+export interface EntryCreateInput {
+  event_id: number;
+  day_index: number;
+  period: string;
+  round_type: string;
+  start_time: string;
+  end_time: string;
+  venue: string;
+}
+
+export interface LaneCreateInput {
+  group_id: number;
+  athlete_id: number | null;
+  class_team_id: number | null;
 }
 
 export interface ScheduleEntry {
@@ -79,20 +94,43 @@ export async function getConfig(): Promise<ScheduleConfig> {
   return data;
 }
 
+export async function generateSchedule(): Promise<ScheduleData> {
+  const { data } = await client.post<ScheduleData>("/schedule/generate");
+  return data;
+}
+
 export async function updateConfig(payload: ScheduleConfigInput): Promise<ScheduleConfig> {
   const { data } = await client.put<ScheduleConfig>("/schedule/config", payload);
   return data;
 }
 
-export async function regenerate(): Promise<ScheduleConfig> {
-  const { data } = await client.post<ScheduleConfig>("/schedule/generate");
+export async function clearSchedule(adminPassword: string): Promise<ScheduleConfig> {
+  const { data } = await client.post<ScheduleConfig>("/schedule/clear", {
+    admin_password: adminPassword,
+  });
   return data;
 }
 
-export async function aiOptimize(message: string): Promise<ScheduleConfig> {
-  const { data } = await client.post<ScheduleConfig>("/schedule/ai-optimize", { message }, {
-    timeout: 300000, // AI优化需要5分钟超时时间
-  });
+export interface AIOptimizeResult {
+  issues: string[];
+  mode: "generate" | "optimize";
+}
+
+export async function aiOptimize(message: string): Promise<AIOptimizeResult> {
+  const { data } = await client.post<AIOptimizeResult>(
+    "/schedule/ai-optimize",
+    { message },
+    { timeout: 0 }, // 生成/优化耗时较长，不设超时上限
+  );
+  return data;
+}
+
+export async function aiCheck(message: string): Promise<AIOptimizeResult> {
+  const { data } = await client.post<AIOptimizeResult>(
+    "/schedule/ai-check",
+    { message },
+    { timeout: 0 }, // AI 检查耗时较长，不设超时上限
+  );
   return data;
 }
 
@@ -108,6 +146,35 @@ export async function updateEntry(entryId: number, input: EntryUpdateInput): Pro
 
 export async function getEntryDetail(entryId: number): Promise<EntryDetail> {
   const { data } = await client.get<EntryDetail>(`/schedule/entries/${entryId}`);
+  return data;
+}
+
+export async function createEntry(input: EntryCreateInput): Promise<ScheduleEntry> {
+  const { data } = await client.post<ScheduleEntry>("/schedule/entries", input);
+  return data;
+}
+
+export async function deleteEntry(entryId: number): Promise<void> {
+  await client.delete(`/schedule/entries/${entryId}`);
+}
+
+export async function addGroup(entryId: number): Promise<EntryDetail> {
+  const { data } = await client.post<EntryDetail>(`/schedule/entries/${entryId}/groups`);
+  return data;
+}
+
+export async function deleteGroup(entryId: number, groupId: number): Promise<EntryDetail> {
+  const { data } = await client.delete<EntryDetail>(`/schedule/entries/${entryId}/groups/${groupId}`);
+  return data;
+}
+
+export async function addLane(entryId: number, input: LaneCreateInput): Promise<EntryDetail> {
+  const { data } = await client.post<EntryDetail>(`/schedule/entries/${entryId}/lanes/add`, input);
+  return data;
+}
+
+export async function deleteLane(entryId: number, laneId: number): Promise<EntryDetail> {
+  const { data } = await client.delete<EntryDetail>(`/schedule/entries/${entryId}/lanes/${laneId}`);
   return data;
 }
 
