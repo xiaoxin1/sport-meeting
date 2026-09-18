@@ -14,8 +14,11 @@
         <el-button type="primary" @click="loadPreview" :loading="loading">
           生成预览
         </el-button>
-        <el-button type="success" @click="exportProgram" :disabled="!programData">
-          导出文件
+        <el-button type="success" @click="exportExcel" :disabled="!programData">
+          导出 Excel
+        </el-button>
+        <el-button type="warning" @click="exportPdf" :disabled="!programData">
+          导出 PDF
         </el-button>
       </div>
     </div>
@@ -158,6 +161,157 @@
           </div>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 打印专用布局：屏幕隐藏，打印/导出 PDF 时纵向平铺五个章节 -->
+      <div class="print-layout">
+        <h1 class="print-title">秩序册</h1>
+
+        <!-- 1. 参赛队统计 -->
+        <section class="print-section">
+          <h2>参赛队统计</h2>
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th>序号</th><th>年级</th><th>班级</th>
+                <th>男生号码范围</th><th>女生号码范围</th>
+                <th>男生人数</th><th>女生人数</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="t in programData.team_stats.teams" :key="t.index">
+                <td>{{ t.index }}</td><td>{{ t.grade }}</td><td>{{ t.class_name }}</td>
+                <td>{{ t.male_range }}</td><td>{{ t.female_range }}</td>
+                <td>{{ t.male_count }}</td><td>{{ t.female_count }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <h3>年级汇总</h3>
+          <table class="print-table">
+            <thead>
+              <tr><th>年级</th><th>男生总数</th><th>女生总数</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in gradeSummaryData" :key="s.grade">
+                <td>{{ s.grade }}</td><td>{{ s.male }}</td><td>{{ s.female }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- 2. 代表队名单 -->
+        <section class="print-section">
+          <h2>代表队名单</h2>
+          <div v-for="roster in programData.team_rosters" :key="roster.index" class="print-roster">
+            <h3>{{ roster.index }}. {{ roster.grade }} {{ roster.class_name }}</h3>
+            <p><strong>领队：</strong>{{ roster.leader_name || '未设置' }}</p>
+            <p><strong>男生：</strong>
+              <span v-if="roster.male_athletes.length">
+                {{ roster.male_athletes.map(a => `${a.number}-${a.name}`).join('、') }}
+              </span>
+              <span v-else>无</span>
+            </p>
+            <p><strong>女生：</strong>
+              <span v-if="roster.female_athletes.length">
+                {{ roster.female_athletes.map(a => `${a.number}-${a.name}`).join('、') }}
+              </span>
+              <span v-else>无</span>
+            </p>
+          </div>
+        </section>
+
+        <!-- 3. 竞赛日程 -->
+        <section class="print-section">
+          <h2>竞赛日程</h2>
+          <div v-for="period in programData.schedule" :key="`p-${period.day}-${period.period}`">
+            <h3>第{{ period.day }}天 {{ period.period }}</h3>
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th>序号</th><th>年级</th><th>性别</th><th>项目名称</th>
+                  <th>赛次</th><th>人数</th><th>组数/取名</th><th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="event in period.events" :key="event.index">
+                  <td>{{ event.index }}</td><td>{{ event.group_name }}</td>
+                  <td>{{ event.gender }}</td><td>{{ event.event_name }}</td>
+                  <td>{{ event.round_type }}</td><td>{{ event.participant_count }}</td>
+                  <td>{{ event.group_count }}组/取{{ event.advance_count }}名</td>
+                  <td>{{ event.time }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 4. 项目分组表 -->
+        <section class="print-section">
+          <h2>项目分组表</h2>
+          <div v-for="period in programData.grouping" :key="`g-${period.day}-${period.period}`">
+            <h3>第{{ period.day }}天 {{ period.period }}</h3>
+            <div v-for="event in period.events" :key="event.index" class="print-event">
+              <p class="print-event-title">
+                <strong>{{ event.index }}. {{ event.group_name }} {{ event.gender }}
+                {{ event.event_name }} {{ event.round_type }}</strong>
+                （人数：{{ event.participant_count }}，{{ event.group_count }}组/取{{ event.advance_count }}名，{{ event.time }}）
+              </p>
+              <div v-for="group in event.groups" :key="group.group_index" class="print-group">
+                <table class="print-table">
+                  <thead>
+                    <tr>
+                      <th :colspan="event.is_team ? 2 : 4">第{{ group.group_index }}组</th>
+                    </tr>
+                    <tr>
+                      <th>道次</th>
+                      <th v-if="!event.is_team">号码</th>
+                      <th v-if="!event.is_team">学生</th>
+                      <th>班级</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="lane in group.lanes" :key="lane.lane">
+                      <td>{{ lane.lane }}</td>
+                      <td v-if="!event.is_team">{{ lane.bib_number }}</td>
+                      <td v-if="!event.is_team">{{ lane.athlete_name }}</td>
+                      <td>{{ lane.class_name }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. 最高记录 -->
+        <section class="print-section print-section--landscape">
+          <h2>最高记录</h2>
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th rowspan="2">项目</th>
+                <th rowspan="2">性别</th>
+                <th v-for="grade in programData.records.grades" :key="grade" colspan="2">{{ grade }}</th>
+              </tr>
+              <tr>
+                <template v-for="grade in programData.records.grades" :key="`h-${grade}`">
+                  <th>保持者</th>
+                  <th>历史成绩</th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in programData.records.rows" :key="i">
+                <td>{{ row.event_name }}</td>
+                <td>{{ row.gender }}</td>
+                <template v-for="grade in programData.records.grades" :key="`c-${grade}`">
+                  <td>{{ row.records[grade]?.holder_name || '' }}</td>
+                  <td>{{ row.records[grade]?.result || '' }}</td>
+                </template>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
     </div>
 
     <el-empty v-else-if="!loading" description="点击「生成预览」查看秩序册内容" />
@@ -257,7 +411,7 @@ async function loadPreview() {
   }
 }
 
-function exportProgram() {
+function exportExcel() {
   if (!programData.value) {
     ElMessage.warning('请先生成预览');
     return;
@@ -375,6 +529,16 @@ function exportProgram() {
     ElMessage.error('导出失败');
     console.error('导出秩序册失败:', error);
   }
+}
+
+function exportPdf() {
+  if (!programData.value) {
+    ElMessage.warning('请先生成预览');
+    return;
+  }
+  // 打印布局在 @media print 下呈现为五个章节纵向平铺，
+  // 用户在浏览器打印弹窗中选择「另存为 PDF」即可。
+  window.print();
 }
 
 function showDevTools() {
@@ -559,5 +723,145 @@ async function generateResults() {
 .record-best {
   color: #f56c6c;
   font-weight: bold;
+}
+
+/* 打印布局默认在屏幕上隐藏 */
+.print-layout {
+  display: none;
+}
+</style>
+
+<!-- 打印/导出 PDF 专用样式（非 scoped，需作用于整个文档） -->
+<style>
+@media print {
+  /* 解除布局容器的固定高度/滚动限制，否则绝对定位内容会被裁剪成一屏 */
+  html,
+  body,
+  #app,
+  .layout,
+  .el-container,
+  .el-main {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* 直接隐藏侧边栏、页头、操作按钮和屏幕版 tab（display:none 不占空间） */
+  .sidebar,
+  .header,
+  .program-view > .header,
+  .el-tabs {
+    display: none !important;
+  }
+
+  .el-main {
+    padding: 0 !important;
+  }
+
+  .print-layout {
+    display: block !important;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    font-size: 12px;
+  }
+
+  .print-title {
+    text-align: center;
+    font-size: 22px;
+    margin: 0 0 16px;
+  }
+
+  /* 每个章节另起一页；用默认（竖版）页，避免标题与首章各占空白页 */
+  .print-section {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  /* 标题和第一章同页，不额外分页 */
+  .print-title,
+  .print-section:first-of-type {
+    page-break-before: avoid;
+    break-before: auto;
+  }
+
+  /* 最高记录列多，横屏打印，并撑满横版页宽（A4 横向 29.7cm - 左右各 1.5cm 边距） */
+  .print-section--landscape {
+    page: landscape;
+    width: 26.7cm;
+  }
+
+  /* 最高记录列多，字号和内边距再调小，尽量放进一页 */
+  .print-section--landscape .print-table th,
+  .print-section--landscape .print-table td {
+    padding: 1px 2px;
+    font-size: 8px;
+    line-height: 1.1;
+  }
+
+  .print-section > h2 {
+    font-size: 16px;
+    margin: 0 0 12px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #000;
+    text-align: center;
+  }
+
+  .print-section h3 {
+    font-size: 14px;
+    margin: 14px 0 6px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #000;
+    padding: 3px 6px;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  /* 避免行、分组被跨页截断 */
+  .print-table tr,
+  .print-roster,
+  .print-group {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-roster {
+    margin-bottom: 10px;
+  }
+
+  .print-roster p,
+  .print-event-title {
+    margin: 2px 0;
+    text-align: left;
+  }
+
+  .print-event {
+    margin-bottom: 10px;
+  }
+
+  /* 默认页：竖版。标题+前四章都用它，不再命名，避免页名切换产生空白页 */
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+
+  /* 仅最高记录用横版命名页 */
+  @page landscape {
+    size: A4 landscape;
+    margin: 1.5cm;
+  }
 }
 </style>

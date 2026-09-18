@@ -353,8 +353,11 @@ def get_records_matrix(db: Session):
     from app.services.numbering import GRADE_ORDER, _grade_key
 
     fixed_grades = GRADE_ORDER[GRADE_ORDER.index("三年级"):]
+    # 三年级之前的年级（一年级、二年级）一律不展示
+    excluded_grades = set(GRADE_ORDER[:GRADE_ORDER.index("三年级")])
     extra_grades = sorted(
-        (g for g in grades if g not in fixed_grades), key=_grade_key
+        (g for g in grades if g not in fixed_grades and g not in excluded_grades),
+        key=_grade_key,
     )
     grades_list = fixed_grades + extra_grades
     rows = []
